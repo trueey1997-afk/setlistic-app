@@ -1,0 +1,69 @@
+@import 'tailwindcss';
+
+/* `dark:` follows the in-app theme switch, not the OS setting */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/* Light theme for bright stages, dark (default) for dim rooms. Set via <html data-theme>. */
+:root {
+  color-scheme: light;
+  --background: #f6f6f6;
+  --foreground: #141414;
+  --card: #ffffff;
+  --muted: #ededed;
+  --muted-foreground: #666666;
+  --border: #dddddd;
+  --primary: #d11f25;
+  --primary-hover: #b3181d;
+  --primary-foreground: #ffffff;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --background: #0d0d0d;
+  --foreground: #ececec;
+  --card: #151515;
+  --muted: #1f1f1f;
+  --muted-foreground: #8e8e8e;
+  --border: #2a2a2a;
+  --primary: #e0282e;
+  --primary-hover: #c71f25;
+  --primary-foreground: #ffffff;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  /* System fonts only, so the app looks right with no internet */
+  --font-sans: 'Segoe UI', 'Leelawadee UI', 'Noto Sans Thai', system-ui, sans-serif;
+  --font-mono: 'Cascadia Mono', Consolas, 'Noto Sans Mono', ui-monospace, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--primary);
+  color: #fff;
+}
+
+dialog::backdrop {
+  background: rgb(0 0 0 / 0.6);
+}

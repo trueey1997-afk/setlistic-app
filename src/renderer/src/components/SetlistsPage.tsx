@@ -29,14 +29,16 @@ import { useAsync } from '@renderer/hooks/useAsync'
 import { SetlistItems } from './SetlistItems'
 import { SongStatusBadge } from './links'
 import { useRun, useToast } from './toast'
-import { Badge, Button, Dialog, EmptyState, Field, Input, Select, Textarea } from './ui'
+import { Badge, Button, Dialog, EmptyState, Field, Input, Select, SidePane, Textarea } from './ui'
 
 export function SetlistsPage({
   bandId,
-  bandName
+  bandName,
+  sidebarOpen
 }: {
   bandId: number
   bandName: string
+  sidebarOpen: boolean
 }): React.JSX.Element {
   const setlists = useAsync(() => window.setlistic.setlists.list(bandId), `setlists:${bandId}`)
   const [selectedId, setSelectedId] = useState<number | null>(null)
@@ -45,7 +47,7 @@ export function SetlistsPage({
 
   return (
     <div className="flex min-h-0 flex-1">
-      <aside className="flex w-[340px] shrink-0 flex-col border-r border-border">
+      <SidePane open={sidebarOpen} label="รายการเซ็ตลิสต์" className="w-[340px]">
         <div className="border-b border-border p-3">
           <Button className="w-full" onClick={() => setCreating(true)}>
             <Plus /> สร้างเซ็ตลิสต์
@@ -69,7 +71,7 @@ export function SetlistsPage({
             ))}
           </ul>
         </div>
-      </aside>
+      </SidePane>
 
       <section className="min-w-0 flex-1 overflow-y-auto">
         {selectedId ? (
@@ -345,7 +347,8 @@ function SetlistView({
               onPlayed={setPlayed}
             />
             <p className="text-xs text-muted-foreground">
-              ลากที่ไอคอน ⋮⋮ หรือกดลูกศรเพื่อจัดลำดับ · คลิกชื่อสมาชิกเพื่อเปลี่ยนสถานะการซ้อม · ติ๊กช่องใต้เลขลำดับเมื่อเล่นเพลงนั้นแล้ว
+              ลากที่ไอคอน ⋮⋮ หรือกดลูกศรเพื่อจัดลำดับ · คลิกชื่อสมาชิกเพื่อเปลี่ยนสถานะการซ้อม ·
+              ติ๊กช่องใต้เลขลำดับเมื่อเล่นเพลงนั้นแล้ว
             </p>
           </>
         )}

@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, type IpcMainInvokeEvent } from 'electron'
+import { app, shell, session, BrowserWindow, type IpcMainInvokeEvent } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -39,7 +39,9 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: true,
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      // For the in-app chord viewer; locked down in will-attach-webview below
+      webviewTag: true
     }
   })
 
@@ -54,6 +56,15 @@ function createWindow(): void {
     if (!isAppUrl(url)) event.preventDefault()
   })
 
+  // Webviews only ever show web pages, with no preload and no Node
+  mainWindow.webContents.on('will-attach-webview', (event, webPreferences, params) => {
+    delete webPreferences.preload
+    webPreferences.nodeIntegration = false
+    webPreferences.contextIsolation = true
+    webPreferences.sandbox = true
+    if (!/^https?:\/\//.test(params.src)) event.preventDefault()
+  })
+
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
@@ -63,6 +74,23 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.setlistic.app')
+
+  // A file:// page sends no Referer and YouTube then refuses to play embeds (error 153).
+  // YouTube asks embedding apps to identify themselves as https://<app id>.
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    { urls: ['https://www.youtube-nocookie.com/*'] },
+    ({ requestHeaders }, callback) => {
+      requestHeaders['Referer'] ??= 'https://com.setlistic.app/'
+      callback({ requestHeaders })
+    }
+  )
+
+  // Chord sites' pop-ups (mostly ads) are dropped; their links stay in the viewer
+  app.on('web-contents-created', (_, contents) => {
+    if (contents.getType() === 'webview') {
+      contents.setWindowOpenHandler(() => ({ action: 'deny' }))
+    }
+  })
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)

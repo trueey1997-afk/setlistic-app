@@ -9,7 +9,7 @@ import {
   type SongStatus
 } from '@shared/types'
 import { formatClock, parseClock } from '@shared/format'
-import { Button, Dialog, Field, Input, Select, Textarea } from './ui'
+import { Button, Dialog, Field, Input, Select } from './ui'
 
 export function SongFormDialog({
   bandId,
@@ -81,7 +81,8 @@ function SongForm({
             .filter(Boolean)
         )
       ],
-      content: String(f.get('content') ?? ''),
+      // No editor for this any more; keep whatever the song already has
+      content: song?.content ?? '',
       notes: str('notes')
     }
 
@@ -148,17 +149,6 @@ function SongForm({
       </Field>
       <Field label="แท็ก (คั่นด้วย ,)" className="col-span-4">
         <Input name="tags" placeholder="เพลงช้า, เปิดงาน" defaultValue={song?.tags.join(', ')} />
-      </Field>
-      <Field label="เนื้อเพลง / คอร์ด" className="col-span-4">
-        <Textarea
-          name="content"
-          rows={10}
-          maxLength={50_000}
-          defaultValue={song?.content}
-          spellCheck={false}
-          placeholder={'[Intro] G  D  Em  C\n\n   G              D\nเนื้อเพลงบรรทัดแรก...'}
-          className="font-mono leading-relaxed"
-        />
       </Field>
       <Field label="โน้ตย่อ" className="col-span-4">
         <Input

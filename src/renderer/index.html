@@ -3,10 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <title>Setlistic</title>
-    <!-- Offline app: everything is bundled, nothing is loaded from the network -->
+    <!-- Offline-first: everything is bundled; only the YouTube player is framed from the network
+         (chord pages load in a <webview>, a separate guest page outside this policy) -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-src https://www.youtube-nocookie.com"
     />
   </head>
 

@@ -14,10 +14,17 @@ import { useAsync } from '@renderer/hooks/useAsync'
 import { InstrumentNotes } from './InstrumentNotes'
 import { SongFormDialog } from './SongForm'
 import { SongLinks, SongStatusBadge } from './links'
+import { ChordPane, YouTubePlayer } from './SongMedia'
 import { useRun } from './toast'
-import { Badge, Button, EmptyState, Input, Select } from './ui'
+import { Badge, Button, EmptyState, Input, Select, SidePane } from './ui'
 
-export function SongLibrary({ bandId }: { bandId: number }): React.JSX.Element {
+export function SongLibrary({
+  bandId,
+  sidebarOpen
+}: {
+  bandId: number
+  sidebarOpen: boolean
+}): React.JSX.Element {
   const run = useRun()
   const [search, setSearch] = useState('')
   const [key, setKey] = useState<MusicalKey | ''>('')
@@ -64,7 +71,7 @@ export function SongLibrary({ bandId }: { bandId: number }): React.JSX.Element {
   return (
     <div className="flex min-h-0 flex-1">
       {/* ── List pane ── */}
-      <aside className="flex w-[380px] shrink-0 flex-col border-r border-border">
+      <SidePane open={sidebarOpen} label="รายการเพลง" className="w-[380px]">
         <div className="flex flex-col gap-2 border-b border-border p-3">
           <div className="relative">
             <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -158,7 +165,7 @@ export function SongLibrary({ bandId }: { bandId: number }): React.JSX.Element {
             {songs.data.length} เพลง
           </p>
         )}
-      </aside>
+      </SidePane>
 
       {/* ── Detail pane ── */}
       <section className="min-w-0 flex-1 overflow-y-auto">
@@ -171,7 +178,7 @@ export function SongLibrary({ bandId }: { bandId: number }): React.JSX.Element {
             onChange={() => songs.reload()}
           />
         ) : (
-          <EmptyState icon={<Music />} title="เลือกเพลงจากรายการเพื่อดูเนื้อเพลง คอร์ด และโน้ต" />
+          <EmptyState icon={<Music />} title="เลือกเพลงจากรายการเพื่อฟังเพลง ดูคอร์ด และโน้ต" />
         )}
       </section>
 
@@ -204,9 +211,10 @@ function SongDetail({
   onChange: (song: Song) => void
 }): React.JSX.Element {
   return (
-    <article className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
-      <header className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
+    // Container queries: the split depends on the pane's width, which the sidebar changes
+    <article className="@container mx-auto flex max-w-[1600px] flex-col gap-5 p-6">
+      <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+        <div className="min-w-0 flex-1">
           <h1 className="text-3xl font-bold break-words">{song.title}</h1>
           <p className="mt-1 text-muted-foreground">{song.artist || '—'}</p>
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
@@ -217,6 +225,11 @@ function SongDetail({
             <SongLinks youtubeUrl={song.youtubeUrl} chordUrl={song.chordUrl} />
           </div>
         </div>
+        <dl className="flex shrink-0 gap-6 font-mono">
+          <Stat label="KEY" value={song.key ?? '–'} accent />
+          <Stat label="BPM" value={song.bpm?.toString() ?? '–'} />
+          <Stat label="TIME" value={formatClock(song.durationSec)} />
+        </dl>
         <div className="flex shrink-0 gap-1">
           <Button variant="outline" onClick={onEdit}>
             <Pencil /> แก้ไข
@@ -227,25 +240,16 @@ function SongDetail({
         </div>
       </header>
 
-      <dl className="grid grid-cols-3 border-y border-border font-mono">
-        <Stat label="KEY" value={song.key ?? '–'} accent />
-        <Stat label="BPM" value={song.bpm?.toString() ?? '–'} />
-        <Stat label="TIME" value={formatClock(song.durationSec)} />
-      </dl>
-
       {song.notes && <p className="border-l-2 border-primary pl-3 text-sm">{song.notes}</p>}
 
-      {song.content ? (
-        <pre className="font-mono text-[15px] leading-relaxed whitespace-pre-wrap">
-          {song.content}
-        </pre>
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          ยังไม่มีเนื้อเพลง/คอร์ด กด &quot;แก้ไข&quot; เพื่อเพิ่ม
-        </p>
-      )}
-
-      <InstrumentNotes song={song} members={members} onChange={onChange} />
+      {/* 65 / 35 split once there's room; stacked (player first) in a narrow pane */}
+      <div className="grid items-start gap-6 @3xl:grid-cols-[minmax(0,65fr)_minmax(0,35fr)]">
+        <ChordPane key={song.id} chordUrl={song.chordUrl} content={song.content} />
+        <aside className="order-first flex flex-col gap-6 @3xl:sticky @3xl:top-6 @3xl:order-none @3xl:max-h-[calc(100vh-6rem)] @3xl:overflow-y-auto">
+          <YouTubePlayer url={song.youtubeUrl} title={song.title} />
+          <InstrumentNotes song={song} members={members} onChange={onChange} />
+        </aside>
+      </div>
     </article>
   )
 }
@@ -260,7 +264,7 @@ function Stat({
   accent?: boolean
 }): React.JSX.Element {
   return (
-    <div className="flex flex-col gap-1 py-3">
+    <div className="flex flex-col gap-1">
       <dt className="text-[11px] tracking-widest text-muted-foreground">{label}</dt>
       <dd className={`text-2xl font-bold ${accent ? 'text-primary' : ''}`}>{value}</dd>
     </div>

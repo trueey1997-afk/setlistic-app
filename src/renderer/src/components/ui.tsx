@@ -161,3 +161,27 @@ export function EmptyState({
     </div>
   )
 }
+
+/** Left list pane; when closed it is gone entirely (the toggle lives in the app header). */
+export function SidePane({
+  open,
+  label,
+  className = '',
+  children
+}: {
+  open: boolean
+  label: string
+  /** Width when open, e.g. `w-[380px]`. */
+  className?: string
+  children: React.ReactNode
+}): React.JSX.Element | null {
+  if (!open) return null
+  return (
+    <aside
+      aria-label={label}
+      className={`flex shrink-0 flex-col border-r border-border ${className}`}
+    >
+      {children}
+    </aside>
+  )
+}

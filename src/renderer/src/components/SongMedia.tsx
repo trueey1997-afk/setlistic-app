@@ -107,11 +107,15 @@ function scrollElement(el: HTMLElement | null, px: number): boolean {
  */
 export function ChordPane({
   chordUrl,
-  content
+  content,
+  fill
 }: {
   chordUrl: string
   content: string
+  /** Take the rest of a flex column (stage mode) instead of a fixed height. */
+  fill?: boolean
 }): React.JSX.Element {
+  const height = fill ? 'min-h-0 flex-1' : PANE_HEIGHT
   const [source, setSource] = useState<'web' | 'text'>(chordUrl ? 'web' : 'text')
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useStoredNumber('setlistic-scroll-speed', SPEED)
@@ -147,7 +151,7 @@ export function ChordPane({
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className={`flex flex-col gap-2 ${fill ? 'min-h-0 flex-1' : ''}`}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-border bg-card px-2 py-1.5">
         <button
           onClick={() => setPlaying(!playing)}
@@ -213,12 +217,12 @@ export function ChordPane({
       </div>
 
       {source === 'web' ? (
-        <ChordWeb key={chordUrl} ref={webviewRef} url={chordUrl} zoom={size / 100} />
+        <ChordWeb key={chordUrl} ref={webviewRef} url={chordUrl} zoom={size / 100} fill={fill} />
       ) : (
         <pre
           ref={textRef}
           style={{ fontSize: (BASE_FONT_PX * size) / 100 }}
-          className={`${PANE_HEIGHT} overflow-y-auto rounded-lg border border-border bg-card p-5 font-mono leading-relaxed whitespace-pre-wrap`}
+          className={`${height} overflow-y-auto rounded-lg border border-border bg-card p-5 font-mono leading-relaxed whitespace-pre-wrap`}
         >
           {content}
         </pre>
@@ -235,11 +239,13 @@ export function ChordPane({
 function ChordWeb({
   ref,
   url,
-  zoom
+  zoom,
+  fill
 }: {
   ref: React.RefObject<WebviewElement | null>
   url: string
   zoom: number
+  fill?: boolean
 }): React.JSX.Element {
   const [canGoBack, setCanGoBack] = useState(false)
   const zoomRef = useRef(zoom)
@@ -269,7 +275,9 @@ function ChordWeb({
   }, [ref])
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-lg border border-border">
+    <div
+      className={`flex flex-col overflow-hidden rounded-lg border border-border ${fill ? 'min-h-0 flex-1' : ''}`}
+    >
       <div className="flex items-center gap-1 border-b border-border bg-muted/40 px-2 py-1">
         <Globe className="mx-1 size-4 shrink-0 text-muted-foreground" />
         <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
@@ -291,7 +299,7 @@ function ChordWeb({
         // Own cookie jar, kept apart from the app and the YouTube player
         // eslint-disable-next-line react/no-unknown-property
         partition="persist:chords"
-        className={`${PANE_HEIGHT} w-full bg-white`}
+        className={`${fill ? 'min-h-0 flex-1' : PANE_HEIGHT} w-full bg-white`}
       />
     </div>
   )

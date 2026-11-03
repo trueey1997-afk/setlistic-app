@@ -16,6 +16,9 @@ Electron 44 · TypeScript · Vite (electron-vite) · React 19 · Tailwind 4 · b
   - เปลี่ยนคีย์เฉพาะงาน และใส่โน้ตต่อเพลง
   - เวลารวมโดยประมาณ (บอกจำนวนเพลงที่ยังไม่ใส่ความยาว)
   - สถานะการซ้อมรายสมาชิกรายเพลง (คลิกชื่อเพื่อเปลี่ยน)
+  - **โหมดเล่นสด**: เต็มจอ ตัวใหญ่ แสดงคีย์/BPM/โน้ต/คอร์ดของเพลงปัจจุบันและเพลงถัดไป
+    เปลี่ยนเพลงด้วยลูกศรหรือ PageUp/PageDown (ใช้กับ pedal พลิกหน้าได้) และติ๊กว่าเล่นแล้วให้อัตโนมัติ
+  - รายการแบ่งเป็น กำลังจะถึง / ยังไม่กำหนดวัน / ที่ผ่านมา และเปิดงานที่ใกล้ที่สุดให้ก่อน
 - **แชร์ให้วง**: Copy for LINE (ข้อความสรุปพร้อมลิงก์ YouTube และคอร์ดของทุกเพลง), ส่งเข้า LINE,
   และ YouTube Playlist ที่เล่นทุกเพลงต่อกันตามลำดับเซ็ต
 - โหมดมืด/สว่างสำหรับเวที, คีย์ลัด `Ctrl+N` (เพิ่มเพลง) และ `Ctrl+F` (ค้นหา)
@@ -52,7 +55,7 @@ src/
 ├── preload/index.ts          สร้าง window.setlistic จาก SetlisticApi
 └── renderer/src/             React UI (ไม่มีสิทธิ์เข้าถึง Node)
     ├── App.tsx               เลือกวง + แท็บ เซ็ตลิสต์ / เพลง / วง & สมาชิก
-    ├── components/           SetlistsPage, SetlistItems, SongLibrary, SongForm,
+    ├── components/           SetlistsPage, SetlistItems, StageMode, SongLibrary, SongForm,
     │                         InstrumentNotes, BandPage, ui, links, toast
     ├── hooks/useAsync.ts
     └── lib/theme.ts

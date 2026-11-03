@@ -12,6 +12,7 @@ import {
 import { formatClock } from '@shared/format'
 import { useAsync } from '@renderer/hooks/useAsync'
 import { InstrumentNotes } from './InstrumentNotes'
+import { KeyChords } from './KeyChords'
 import { SongFormDialog } from './SongForm'
 import { SongLinks, SongStatusBadge } from './links'
 import { ChordPane, YouTubePlayer } from './SongMedia'
@@ -246,7 +247,10 @@ function SongDetail({
       <div className="grid items-start gap-6 @3xl:grid-cols-[minmax(0,65fr)_minmax(0,35fr)]">
         <ChordPane key={song.id} chordUrl={song.chordUrl} content={song.content} />
         <aside className="order-first flex flex-col gap-6 @3xl:sticky @3xl:top-6 @3xl:order-none @3xl:max-h-[calc(100vh-6rem)] @3xl:overflow-y-auto">
-          <YouTubePlayer url={song.youtubeUrl} title={song.title} />
+          <div className="flex flex-col gap-2">
+            <YouTubePlayer url={song.youtubeUrl} title={song.title} />
+            <KeyChords musicalKey={song.key} compact />
+          </div>
           <InstrumentNotes song={song} members={members} onChange={onChange} />
         </aside>
       </div>

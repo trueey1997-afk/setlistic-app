@@ -9,6 +9,7 @@ import {
   type SongStatus
 } from '@shared/types'
 import { formatClock, parseClock } from '@shared/format'
+import { KeyChords } from './KeyChords'
 import { Button, Dialog, Field, Input, Select } from './ui'
 
 export function SongFormDialog({
@@ -52,6 +53,7 @@ function SongForm({
 }): React.JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [key, setKey] = useState<MusicalKey | ''>(song?.key ?? '')
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault()
@@ -108,7 +110,7 @@ function SongForm({
         <Input name="artist" maxLength={200} defaultValue={song?.artist} />
       </Field>
       <Field label="คีย์">
-        <Select name="key" defaultValue={song?.key ?? ''}>
+        <Select name="key" value={key} onChange={(e) => setKey(e.target.value as MusicalKey | '')}>
           <option value="">–</option>
           {MUSICAL_KEYS.map((k) => (
             <option key={k} value={k}>
@@ -136,6 +138,7 @@ function SongForm({
           ))}
         </Select>
       </Field>
+      <KeyChords musicalKey={key || null} className="col-span-4" />
       <Field label="ลิงก์ YouTube" className="col-span-2">
         <Input
           name="youtubeUrl"

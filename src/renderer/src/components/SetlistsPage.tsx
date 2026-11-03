@@ -7,6 +7,7 @@ import {
   ListMusic,
   MapPin,
   Pencil,
+  Play,
   Plus,
   Search,
   Send,
@@ -23,13 +24,44 @@ import {
   type SetlistSummary
 } from '@shared/types'
 import { formatTotal } from '@shared/format'
-import { formatThaiDate, generateLineSummary, isItemReady, lineShareUrl } from '@shared/lineSummary'
+import {
+  SHORT_SUMMARY_LIMIT,
+  formatThaiDate,
+  generateLineSummary,
+  isItemReady,
+  lineShareUrl,
+  type SummaryFormat
+} from '@shared/lineSummary'
 import { buildYouTubePlaylist, YOUTUBE_PLAYLIST_LIMIT } from '@shared/youtube'
 import { useAsync } from '@renderer/hooks/useAsync'
 import { SetlistItems } from './SetlistItems'
+import { StageMode } from './StageMode'
 import { SongStatusBadge } from './links'
 import { useRun, useToast } from './toast'
 import { Badge, Button, Dialog, EmptyState, Field, Input, Select, SidePane, Textarea } from './ui'
+
+const SUMMARY_FORMATS: [SummaryFormat, string][] = [
+  ['full', 'LINE (ละเอียด)'],
+  ['short', 'สั้น (IG / Messenger)']
+]
+
+/** Local date as YYYY-MM-DD, comparable with `eventDate`. */
+function todayString(): string {
+  return new Date().toLocaleDateString('sv-SE')
+}
+
+/** Splits the list (dated newest first, then undated) into the groups shown in the side pane. */
+function groupSetlists(list: SetlistSummary[]): { label: string; items: SetlistSummary[] }[] {
+  const today = todayString()
+  const upcoming = list.filter((s) => s.eventDate && s.eventDate >= today).reverse() // nearest first
+  const undated = list.filter((s) => !s.eventDate)
+  const past = list.filter((s) => s.eventDate && s.eventDate < today)
+  return [
+    { label: 'กำลังจะถึง', items: upcoming },
+    { label: 'ยังไม่กำหนดวัน', items: undated },
+    { label: 'ที่ผ่านมา', items: past }
+  ].filter((g) => g.items.length > 0)
+}
 
 export function SetlistsPage({
   bandId,
@@ -44,6 +76,9 @@ export function SetlistsPage({
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [creating, setCreating] = useState(false)
   const run = useRun()
+  const groups = groupSetlists(setlists.data ?? [])
+  // Until something is picked, open the next show/rehearsal (or the newest one)
+  const activeId = selectedId ?? groups[0]?.items[0]?.id ?? null
 
   return (
     <div className="flex min-h-0 flex-1">
@@ -59,25 +94,32 @@ export function SetlistsPage({
               ยังไม่มีเซ็ตลิสต์ สร้างสำหรับวันซ้อมหรือวันเล่นได้เลย
             </p>
           )}
-          <ul>
-            {setlists.data?.map((s) => (
-              <li key={s.id}>
-                <SetlistRow
-                  setlist={s}
-                  selected={s.id === selectedId}
-                  onClick={() => setSelectedId(s.id)}
-                />
-              </li>
-            ))}
-          </ul>
+          {groups.map((g) => (
+            <section key={g.label} aria-label={g.label}>
+              <h3 className="sticky top-0 z-[1] bg-background/95 px-3 pt-3 pb-1 text-[11px] font-bold tracking-widest text-muted-foreground uppercase backdrop-blur">
+                {g.label} · {g.items.length}
+              </h3>
+              <ul>
+                {g.items.map((s) => (
+                  <li key={s.id}>
+                    <SetlistRow
+                      setlist={s}
+                      selected={s.id === activeId}
+                      onClick={() => setSelectedId(s.id)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
         </div>
       </SidePane>
 
       <section className="min-w-0 flex-1 overflow-y-auto">
-        {selectedId ? (
+        {activeId ? (
           <SetlistView
-            key={selectedId}
-            setlistId={selectedId}
+            key={activeId}
+            setlistId={activeId}
             bandId={bandId}
             bandName={bandName}
             onChanged={setlists.reload}
@@ -116,6 +158,7 @@ function SetlistRow({
   onClick: () => void
 }): React.JSX.Element {
   const date = s.eventDate ? new Date(`${s.eventDate}T00:00:00`) : null
+  const isToday = s.eventDate === todayString()
   return (
     <button
       onClick={onClick}
@@ -143,7 +186,10 @@ function SetlistRow({
         )}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold">{s.name}</span>
+        <span className="flex items-center gap-1.5">
+          <span className="truncate text-sm font-semibold">{s.name}</span>
+          {isToday && <Badge tone="primary">วันนี้</Badge>}
+        </span>
         <span className="block truncate text-xs text-muted-foreground">
           {SETLIST_KIND_LABEL[s.kind]}
           {s.eventTime && ` · ${s.eventTime}`}
@@ -177,6 +223,8 @@ function SetlistView({
   const [editing, setEditing] = useState(false)
   const [adding, setAdding] = useState(false)
   const [includeProgress, setIncludeProgress] = useState(false)
+  const [format, setFormat] = useState<SummaryFormat>('full')
+  const [onStage, setOnStage] = useState(false)
 
   if (!setlist.data) return <p className="p-6 text-primary">{setlist.error}</p>
   const s = setlist.data
@@ -199,7 +247,8 @@ function SetlistView({
     )
   }
 
-  const text = generateLineSummary(s, { bandName, includeProgress })
+  const text = generateLineSummary(s, { bandName, includeProgress, format })
+  const tooLong = format === 'short' && text.length > SHORT_SUMMARY_LIMIT
   const playlist = buildYouTubePlaylist(s.items.map((it) => it.song))
   const readyCount = s.items.filter(isItemReady).length
   const playedCount = s.items.filter((it) => it.played).length
@@ -240,6 +289,13 @@ function SetlistView({
           {s.notes && <p className="text-sm">{s.notes}</p>}
         </div>
         <div className="flex shrink-0 gap-1">
+          <Button
+            disabled={s.items.length === 0}
+            onClick={() => setOnStage(true)}
+            title="เต็มจอ ตัวใหญ่ เปลี่ยนเพลงด้วยลูกศรหรือ pedal"
+          >
+            <Play /> เริ่มเล่นสด
+          </Button>
           <Button variant="outline" onClick={() => setEditing(true)}>
             <Pencil /> แก้ไข
           </Button>
@@ -258,18 +314,45 @@ function SetlistView({
 
       {/* ── Share bar ── */}
       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border p-3">
-        <Button
-          disabled={s.items.length === 0}
-          onClick={async () => {
-            if ((await run(window.setlistic.system.copyText(text))) !== undefined)
-              toast('คัดลอกแล้ว ไปวางในกลุ่ม LINE ได้เลย')
-          }}
+        <div
+          role="radiogroup"
+          aria-label="รูปแบบข้อความ"
+          className="flex rounded-md border border-border p-0.5 text-xs font-semibold"
         >
-          <Copy /> Copy for LINE
-        </Button>
+          {SUMMARY_FORMATS.map(([value, label]) => (
+            <button
+              key={value}
+              role="radio"
+              aria-checked={format === value}
+              onClick={() => setFormat(value)}
+              className={`rounded px-2.5 py-1.5 ${
+                format === value
+                  ? 'bg-muted text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <Button
           variant="outline"
           disabled={s.items.length === 0}
+          onClick={async () => {
+            if ((await run(window.setlistic.system.copyText(text))) !== undefined)
+              toast(
+                format === 'short'
+                  ? 'คัดลอกแล้ว ไปวางในแชตได้เลย'
+                  : 'คัดลอกแล้ว ไปวางในกลุ่ม LINE ได้เลย'
+              )
+          }}
+        >
+          <Copy /> คัดลอกข้อความ
+        </Button>
+        <Button
+          variant="outline"
+          disabled={s.items.length === 0 || format === 'short'}
+          title={format === 'short' ? 'ส่งเข้า LINE ใช้แบบละเอียด' : undefined}
           onClick={() => run(window.setlistic.system.openExternal(lineShareUrl(text)))}
         >
           <Send /> ส่งเข้า LINE
@@ -301,8 +384,17 @@ function SetlistView({
         </label>
         <details className="w-full text-sm">
           <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-            ดูตัวอย่างข้อความ
+            ดูตัวอย่างข้อความ{' '}
+            <span className={`font-mono text-xs ${tooLong ? 'text-primary' : ''}`}>
+              ({text.length.toLocaleString()}
+              {format === 'short' && `/${SHORT_SUMMARY_LIMIT.toLocaleString()}`} ตัวอักษร)
+            </span>
           </summary>
+          {tooLong && (
+            <p className="mt-2 text-xs text-primary">
+              ยาวเกินที่ IG ส่งได้ในข้อความเดียว ลองย่อชื่อเซ็ต/สถานที่ หรือแบ่งเซ็ตเป็นสองช่วง
+            </p>
+          )}
           <pre className="mt-2 max-h-72 overflow-auto rounded-md bg-muted p-3 font-sans text-xs whitespace-pre-wrap">
             {text}
           </pre>
@@ -312,19 +404,17 @@ function SetlistView({
       {/* ── Songs ── */}
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">
-            รายการเพลง
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-6 gap-y-2">
+            <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">
+              รายการเพลง · {s.items.length}
+            </h2>
             {s.items.length > 0 && s.items[0].progress.length > 0 && (
-              <span className="ml-3 normal-case">
-                ทั้งวงพร้อม {readyCount}/{s.items.length}
-              </span>
+              <Meter label="ทั้งวงพร้อม" value={readyCount} total={s.items.length} tone="success" />
             )}
             {playedCount > 0 && (
-              <span className="ml-3 normal-case">
-                เล่นแล้ว {playedCount}/{s.items.length}
-              </span>
+              <Meter label="เล่นแล้ว" value={playedCount} total={s.items.length} />
             )}
-          </h2>
+          </div>
           <Button variant="outline" onClick={() => setAdding(true)}>
             <Plus /> เพิ่มเพลง
           </Button>
@@ -354,6 +444,8 @@ function SetlistView({
         )}
       </section>
 
+      {onStage && <StageMode setlist={s} onPlayed={setPlayed} onClose={() => setOnStage(false)} />}
+
       <AddSongsDialog
         bandId={bandId}
         open={adding}
@@ -372,6 +464,33 @@ function SetlistView({
         }}
       />
     </div>
+  )
+}
+
+function Meter({
+  label,
+  value,
+  total,
+  tone = 'primary'
+}: {
+  label: string
+  value: number
+  total: number
+  tone?: 'primary' | 'success'
+}): React.JSX.Element {
+  return (
+    <span className="flex items-center gap-2 text-xs text-muted-foreground">
+      {label}
+      <span className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
+        <span
+          className={`block h-full rounded-full ${tone === 'success' ? 'bg-emerald-500' : 'bg-primary'}`}
+          style={{ width: `${(value / total) * 100}%` }}
+        />
+      </span>
+      <span className="font-mono tabular-nums">
+        {value}/{total}
+      </span>
+    </span>
   )
 }
 

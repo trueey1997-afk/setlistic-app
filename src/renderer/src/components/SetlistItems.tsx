@@ -28,6 +28,7 @@ import {
 } from '@shared/types'
 import { formatClock } from '@shared/format'
 import { isItemReady } from '@shared/lineSummary'
+import { KeyChords } from './KeyChords'
 import { SongLinks } from './links'
 import { Badge, Button, Dialog, Field, Input, Select } from './ui'
 
@@ -106,47 +107,71 @@ export function SetlistItems({
         title={editing ? `ตั้งค่า: ${editing.song.title}` : ''}
       >
         {editing && (
-          <form
+          <ItemForm
             key={editing.id}
-            className="flex flex-col gap-4"
-            onSubmit={(e) => {
-              e.preventDefault()
-              const f = new FormData(e.currentTarget)
-              onEdit(editing, {
-                keyOverride: (String(f.get('keyOverride')) || null) as MusicalKey | null,
-                note: String(f.get('note') ?? '')
-              })
+            item={editing}
+            onCancel={() => setEditing(null)}
+            onSubmit={(input) => {
+              onEdit(editing, input)
               setEditing(null)
             }}
-          >
-            <Field label={`คีย์สำหรับงานนี้ (ต้นฉบับ: ${editing.song.key ?? '–'})`}>
-              <Select name="keyOverride" defaultValue={editing.keyOverride ?? ''}>
-                <option value="">ใช้คีย์ต้นฉบับ</option>
-                {MUSICAL_KEYS.map((k) => (
-                  <option key={k} value={k}>
-                    {k}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="โน้ตสำหรับงานนี้">
-              <Input
-                name="note"
-                maxLength={500}
-                defaultValue={editing.note}
-                placeholder="เช่น ต่อเพลงถัดไปเลย ไม่หยุด"
-              />
-            </Field>
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="ghost" onClick={() => setEditing(null)}>
-                ยกเลิก
-              </Button>
-              <Button type="submit">บันทึก</Button>
-            </div>
-          </form>
+          />
         )}
       </Dialog>
     </>
+  )
+}
+
+/** Per-setlist key and note; the chord chart follows the key as it is picked. */
+function ItemForm({
+  item,
+  onCancel,
+  onSubmit
+}: {
+  item: SetlistItem
+  onCancel: () => void
+  onSubmit: (input: SetlistItemInput) => void
+}): React.JSX.Element {
+  const [keyOverride, setKeyOverride] = useState<MusicalKey | ''>(item.keyOverride ?? '')
+
+  return (
+    <form
+      className="flex flex-col gap-4"
+      onSubmit={(e) => {
+        e.preventDefault()
+        const f = new FormData(e.currentTarget)
+        onSubmit({ keyOverride: keyOverride || null, note: String(f.get('note') ?? '') })
+      }}
+    >
+      <Field label={`คีย์สำหรับงานนี้ (ต้นฉบับ: ${item.song.key ?? '–'})`}>
+        <Select
+          value={keyOverride}
+          onChange={(e) => setKeyOverride(e.target.value as MusicalKey | '')}
+        >
+          <option value="">ใช้คีย์ต้นฉบับ</option>
+          {MUSICAL_KEYS.map((k) => (
+            <option key={k} value={k}>
+              {k}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <KeyChords musicalKey={keyOverride || item.song.key} />
+      <Field label="โน้ตสำหรับงานนี้">
+        <Input
+          name="note"
+          maxLength={500}
+          defaultValue={item.note}
+          placeholder="เช่น ต่อเพลงถัดไปเลย ไม่หยุด"
+        />
+      </Field>
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="ghost" onClick={onCancel}>
+          ยกเลิก
+        </Button>
+        <Button type="submit">บันทึก</Button>
+      </div>
+    </form>
   )
 }
 

@@ -20,6 +20,7 @@ interface SummaryRow {
   event_date: string | null
   event_time: string | null
   venue: string
+  venue_url: string
   notes: string
   song_count: number
   total_sec: number
@@ -35,7 +36,7 @@ type ItemRow = SongRow & {
 
 // Duration totals are computed in SQL so the list view doesn't load every song
 const SUMMARY_SELECT = `
-  SELECT s.id, s.band_id, s.name, s.kind, s.event_date, s.event_time, s.venue, s.notes,
+  SELECT s.id, s.band_id, s.name, s.kind, s.event_date, s.event_time, s.venue, s.venue_url, s.notes,
          COUNT(ss.id)                           AS song_count,
          COALESCE(SUM(so.duration_sec), 0)      AS total_sec,
          COUNT(ss.id) - COUNT(so.duration_sec)  AS unknown_duration_count
@@ -53,6 +54,7 @@ function toSummary(row: SummaryRow): SetlistSummary {
     eventDate: row.event_date,
     eventTime: row.event_time,
     venue: row.venue,
+    venueUrl: row.venue_url,
     songCount: row.song_count,
     totalSec: row.total_sec,
     unknownDurationCount: row.unknown_duration_count
@@ -99,12 +101,12 @@ export function createSetlistRepository(db: Db, songs: SongRepository): SetlistR
     JOIN setlist_songs ss ON ss.id = p.item_id WHERE ss.setlist_id = ?
   `)
   const insert = db.prepare(`
-    INSERT INTO setlists (band_id, name, kind, event_date, event_time, venue, notes)
-    VALUES (@bandId, @name, @kind, @eventDate, @eventTime, @venue, @notes)
+    INSERT INTO setlists (band_id, name, kind, event_date, event_time, venue, venue_url, notes)
+    VALUES (@bandId, @name, @kind, @eventDate, @eventTime, @venue, @venueUrl, @notes)
   `)
   const update = db.prepare(`
     UPDATE setlists SET name = @name, kind = @kind, event_date = @eventDate, event_time = @eventTime,
-      venue = @venue, notes = @notes, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+      venue = @venue, venue_url = @venueUrl, notes = @notes, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
     WHERE id = @id
   `)
   const remove = db.prepare<[number]>('DELETE FROM setlists WHERE id = ?')
@@ -264,6 +266,7 @@ function normalize(input: SetlistInput): Record<string, string | null> {
     eventDate: input.eventDate,
     eventTime: input.eventTime,
     venue: input.venue.trim(),
+    venueUrl: input.venueUrl.trim(),
     notes: input.notes.trim()
   }
 }

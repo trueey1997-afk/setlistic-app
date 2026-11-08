@@ -43,7 +43,8 @@ export function buildYouTubePlaylist(
   if (ids.length === 0) return null
   const used = ids.slice(0, YOUTUBE_PLAYLIST_LIMIT)
   return {
-    url: `https://www.youtube.com/watch_videos?video_ids=${used.join(',')}`,
+    // Commas are encoded: Android chat apps end the tappable link at a bare ","
+    url: `https://www.youtube.com/watch_videos?video_ids=${used.join('%2C')}`,
     videoCount: used.length,
     missingCount: songs.length - ids.length,
     truncated: ids.length > used.length

@@ -4,6 +4,8 @@ import {
   Check,
   CirclePlay,
   Copy,
+  ExternalLink,
+  FileMusic,
   ListMusic,
   MapPin,
   Pencil,
@@ -11,7 +13,8 @@ import {
   Plus,
   Search,
   Send,
-  Timer,
+  Share2,
+  StickyNote,
   Trash2
 } from 'lucide-react'
 import {
@@ -20,10 +23,11 @@ import {
   type SetlistDetail,
   type SetlistInput,
   type SetlistItem,
+  type SetlistItemInput,
   type SetlistKind,
   type SetlistSummary
 } from '@shared/types'
-import { formatTotal } from '@shared/format'
+import { formatClock, formatTotal } from '@shared/format'
 import {
   SHORT_SUMMARY_LIMIT,
   formatThaiDate,
@@ -34,8 +38,9 @@ import {
 } from '@shared/lineSummary'
 import { buildYouTubePlaylist, YOUTUBE_PLAYLIST_LIMIT } from '@shared/youtube'
 import { useAsync } from '@renderer/hooks/useAsync'
-import { SetlistItems } from './SetlistItems'
+import { ItemDialog, SetlistItems } from './SetlistItems'
 import { StageMode } from './StageMode'
+import { YouTubePlayer } from './SongMedia'
 import { SongStatusBadge } from './links'
 import { useRun, useToast } from './toast'
 import { Badge, Button, Dialog, EmptyState, Field, Input, Select, SidePane, Textarea } from './ui'
@@ -115,7 +120,7 @@ export function SetlistsPage({
         </div>
       </SidePane>
 
-      <section className="min-w-0 flex-1 overflow-y-auto">
+      <section className="flex min-w-0 flex-1">
         {activeId ? (
           <SetlistView
             key={activeId}
@@ -224,10 +229,20 @@ function SetlistView({
   const [adding, setAdding] = useState(false)
   const [includeProgress, setIncludeProgress] = useState(false)
   const [format, setFormat] = useState<SummaryFormat>('full')
-  const [onStage, setOnStage] = useState(false)
+  const [sharing, setSharing] = useState(false)
+  const [query, setQuery] = useState('')
+  const [selectedItemId, setSelectedItemId] = useState<number | null>(null)
+  const [editingItem, setEditingItem] = useState<SetlistItem | null>(null)
+  // Item to open stage mode on; null picks up at the first unplayed song
+  const [stage, setStage] = useState<{ startItemId: number | null } | null>(null)
 
-  if (!setlist.data) return <p className="p-6 text-primary">{setlist.error}</p>
+  if (!setlist.data) return <p className="p-6 text-danger">{setlist.error}</p>
   const s = setlist.data
+  const selectedItem = s.items.find((it) => it.id === selectedItemId) ?? s.items[0]
+  const q = query.trim().toLowerCase()
+  const shownItems = q
+    ? s.items.filter((it) => `${it.song.title} ${it.song.artist}`.toLowerCase().includes(q))
+    : s.items
 
   /** Applies a mutation's returned setlist; refreshes the side list when counts may change. */
   async function apply(task: Promise<SetlistDetail>, listChanged = false): Promise<void> {
@@ -262,189 +277,265 @@ function SetlistView({
     apply(window.setlistic.setlists.setPlayed(item.id, played))
   }
 
-  return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6 p-8">
-      <header className="flex items-start justify-between gap-4">
-        <div className="flex min-w-0 flex-col gap-2">
-          <Badge tone={s.kind === 'gig' ? 'primary' : 'neutral'} className="self-start">
-            {SETLIST_KIND_LABEL[s.kind]}
-          </Badge>
-          <h1 className="text-3xl font-bold break-words">{s.name}</h1>
-          <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground [&_svg]:size-4">
-            {s.eventDate && (
-              <span className="inline-flex items-center gap-1">
-                <CalendarDays /> {formatThaiDate(s.eventDate, s.eventTime)}
-              </span>
-            )}
-            {s.venue && (
-              <span className="inline-flex items-center gap-1">
-                <MapPin /> {s.venue}
-              </span>
-            )}
-            <span className="inline-flex items-center gap-1">
-              <Timer /> ~{formatTotal(s.totalSec)}
-              {s.unknownDurationCount > 0 && ` (+${s.unknownDurationCount} เพลงไม่ระบุความยาว)`}
-            </span>
-          </p>
-          {s.notes && <p className="text-sm">{s.notes}</p>}
-        </div>
-        <div className="flex shrink-0 gap-1">
-          <Button
-            disabled={s.items.length === 0}
-            onClick={() => setOnStage(true)}
-            title="เต็มจอ ตัวใหญ่ เปลี่ยนเพลงด้วยลูกศรหรือ pedal"
-          >
-            <Play /> เริ่มเล่นสด
-          </Button>
-          <Button variant="outline" onClick={() => setEditing(true)}>
-            <Pencil /> แก้ไข
-          </Button>
-          <Button
-            variant="danger"
-            aria-label="ลบเซ็ตลิสต์"
-            onClick={async () => {
-              if (!confirm(`ลบเซ็ตลิสต์ "${s.name}"?`)) return
-              if ((await run(window.setlistic.setlists.remove(s.id))) !== undefined) onDeleted()
-            }}
-          >
-            <Trash2 />
-          </Button>
-        </div>
-      </header>
+  function updateItem(item: SetlistItem, input: SetlistItemInput): void {
+    apply(window.setlistic.setlists.updateItem(item.id, input))
+  }
 
-      {/* ── Share bar ── */}
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border p-3">
-        <div
-          role="radiogroup"
-          aria-label="รูปแบบข้อความ"
-          className="flex rounded-md border border-border p-0.5 text-xs font-semibold"
-        >
-          {SUMMARY_FORMATS.map(([value, label]) => (
-            <button
-              key={value}
-              role="radio"
-              aria-checked={format === value}
-              onClick={() => setFormat(value)}
-              className={`rounded px-2.5 py-1.5 ${
-                format === value
-                  ? 'bg-muted text-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <Button
-          variant="outline"
-          disabled={s.items.length === 0}
-          onClick={async () => {
-            if ((await run(window.setlistic.system.copyText(text))) !== undefined)
-              toast(
-                format === 'short'
-                  ? 'คัดลอกแล้ว ไปวางในแชตได้เลย'
-                  : 'คัดลอกแล้ว ไปวางในกลุ่ม LINE ได้เลย'
-              )
-          }}
-        >
-          <Copy /> คัดลอกข้อความ
-        </Button>
-        <Button
-          variant="outline"
-          disabled={s.items.length === 0 || format === 'short'}
-          title={format === 'short' ? 'ส่งเข้า LINE ใช้แบบละเอียด' : undefined}
-          onClick={() => run(window.setlistic.system.openExternal(lineShareUrl(text)))}
-        >
-          <Send /> ส่งเข้า LINE
-        </Button>
-        <Button
-          variant="outline"
-          disabled={!playlist}
-          title={
-            playlist
-              ? `เล่น ${playlist.videoCount} เพลงต่อกันตามลำดับ` +
-                (playlist.missingCount
-                  ? ` · ข้าม ${playlist.missingCount} เพลงที่ไม่มีลิงก์`
-                  : '') +
-                (playlist.truncated ? ` · สูงสุด ${YOUTUBE_PLAYLIST_LIMIT} เพลงแรก` : '')
-              : 'ยังไม่มีเพลงที่มีลิงก์ YouTube'
-          }
-          onClick={() => playlist && run(window.setlistic.system.openExternal(playlist.url))}
-        >
-          <CirclePlay /> YouTube Playlist{playlist && ` (${playlist.videoCount})`}
-        </Button>
-        <label className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
-          <input
-            type="checkbox"
-            checked={includeProgress}
-            onChange={(e) => setIncludeProgress(e.target.checked)}
-            className="size-4 accent-primary"
-          />
-          แนบสถานะการซ้อม
-        </label>
-        <details className="w-full text-sm">
-          <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-            ดูตัวอย่างข้อความ{' '}
-            <span className={`font-mono text-xs ${tooLong ? 'text-primary' : ''}`}>
-              ({text.length.toLocaleString()}
-              {format === 'short' && `/${SHORT_SUMMARY_LIMIT.toLocaleString()}`} ตัวอักษร)
-            </span>
-          </summary>
-          {tooLong && (
-            <p className="mt-2 text-xs text-primary">
-              ยาวเกินที่ IG ส่งได้ในข้อความเดียว ลองย่อชื่อเซ็ต/สถานที่ หรือแบ่งเซ็ตเป็นสองช่วง
-            </p>
+  const numbers = new Map(s.items.map((it, i) => [it.id, i + 1]))
+
+  return (
+    <div className="flex min-h-0 min-w-0 flex-1">
+      {/* ── Workspace ── */}
+      <div className="min-w-0 flex-1 overflow-y-auto">
+        <div className="mx-auto flex max-w-5xl flex-col gap-4 p-6">
+          <header className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <div className="flex items-center gap-2">
+                <Badge tone={s.kind === 'gig' ? 'primary' : 'neutral'}>
+                  {SETLIST_KIND_LABEL[s.kind]}
+                </Badge>
+                <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground [&_svg]:size-4">
+                  {s.eventDate && (
+                    <span className="inline-flex items-center gap-1">
+                      <CalendarDays /> {formatThaiDate(s.eventDate, s.eventTime)}
+                    </span>
+                  )}
+                  <Venue venue={s.venue} venueUrl={s.venueUrl} />
+                </p>
+              </div>
+              <h1 className="text-3xl font-bold break-words">{s.name}</h1>
+              {s.notes && <p className="text-sm text-muted-foreground">{s.notes}</p>}
+            </div>
+            <div className="flex shrink-0 gap-1">
+              <Button
+                disabled={s.items.length === 0}
+                onClick={() => setStage({ startItemId: null })}
+                title="เต็มจอ ตัวใหญ่ เปลี่ยนเพลงด้วยลูกศรหรือ pedal"
+              >
+                <Play /> เล่นสด
+              </Button>
+              <Button
+                variant="outline"
+                aria-expanded={sharing}
+                onClick={() => setSharing(!sharing)}
+                className={sharing ? 'bg-muted' : ''}
+              >
+                <Share2 /> แชร์
+              </Button>
+              <Button variant="ghost" onClick={() => setEditing(true)} aria-label="แก้ไขเซ็ตลิสต์">
+                <Pencil />
+              </Button>
+              <Button
+                variant="danger"
+                aria-label="ลบเซ็ตลิสต์"
+                onClick={async () => {
+                  if (!confirm(`ลบเซ็ตลิสต์ "${s.name}"?`)) return
+                  if ((await run(window.setlistic.setlists.remove(s.id))) !== undefined) onDeleted()
+                }}
+              >
+                <Trash2 />
+              </Button>
+            </div>
+          </header>
+
+          {/* ── Summary ── */}
+          <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <SummaryTile label="เพลงทั้งหมด" value={String(s.items.length)} />
+            <SummaryTile
+              label="ความยาวรวม"
+              value={`~${formatTotal(s.totalSec)}`}
+              hint={
+                s.unknownDurationCount > 0
+                  ? `+${s.unknownDurationCount} เพลงไม่ระบุความยาว`
+                  : undefined
+              }
+            />
+            {s.items.length > 0 && s.items[0].progress.length > 0 ? (
+              <SummaryTile
+                label="ทั้งวงพร้อม"
+                value={`${readyCount}/${s.items.length}`}
+                meter={readyCount / s.items.length}
+                tone="success"
+              />
+            ) : (
+              <SummaryTile label="ทั้งวงพร้อม" value="–" hint="ยังไม่มีสมาชิก" />
+            )}
+            <SummaryTile
+              label="เล่นแล้ว"
+              value={`${playedCount}/${s.items.length}`}
+              meter={s.items.length ? playedCount / s.items.length : 0}
+            />
+          </dl>
+
+          {/* ── Share tools ── */}
+          {sharing && (
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-3">
+              <div
+                role="radiogroup"
+                aria-label="รูปแบบข้อความ"
+                className="flex rounded-lg border border-border p-0.5 text-xs font-semibold"
+              >
+                {SUMMARY_FORMATS.map(([value, label]) => (
+                  <button
+                    key={value}
+                    role="radio"
+                    aria-checked={format === value}
+                    onClick={() => setFormat(value)}
+                    className={`rounded-md px-2.5 py-1.5 ${
+                      format === value
+                        ? 'bg-muted text-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <Button
+                variant="outline"
+                disabled={s.items.length === 0}
+                onClick={async () => {
+                  if ((await run(window.setlistic.system.copyText(text))) !== undefined)
+                    toast(
+                      format === 'short'
+                        ? 'คัดลอกแล้ว ไปวางในแชตได้เลย'
+                        : 'คัดลอกแล้ว ไปวางในกลุ่ม LINE ได้เลย'
+                    )
+                }}
+              >
+                <Copy /> คัดลอกข้อความ
+              </Button>
+              <Button
+                variant="outline"
+                disabled={s.items.length === 0 || format === 'short'}
+                title={format === 'short' ? 'ส่งเข้า LINE ใช้แบบละเอียด' : undefined}
+                onClick={() => run(window.setlistic.system.openExternal(lineShareUrl(text)))}
+              >
+                <Send /> ส่งเข้า LINE
+              </Button>
+              <Button
+                variant="outline"
+                disabled={!playlist}
+                title={
+                  playlist
+                    ? `เล่น ${playlist.videoCount} เพลงต่อกันตามลำดับ` +
+                      (playlist.missingCount
+                        ? ` · ข้าม ${playlist.missingCount} เพลงที่ไม่มีลิงก์`
+                        : '') +
+                      (playlist.truncated ? ` · สูงสุด ${YOUTUBE_PLAYLIST_LIMIT} เพลงแรก` : '')
+                    : 'ยังไม่มีเพลงที่มีลิงก์ YouTube'
+                }
+                onClick={() => playlist && run(window.setlistic.system.openExternal(playlist.url))}
+              >
+                <CirclePlay /> YouTube Playlist{playlist && ` (${playlist.videoCount})`}
+              </Button>
+              <label className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={includeProgress}
+                  onChange={(e) => setIncludeProgress(e.target.checked)}
+                  className="size-4 accent-primary"
+                />
+                แนบสถานะการซ้อม
+              </label>
+              <details className="w-full text-sm">
+                <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                  ดูตัวอย่างข้อความ{' '}
+                  <span className={`font-mono text-xs ${tooLong ? 'text-danger' : ''}`}>
+                    ({text.length.toLocaleString()}
+                    {format === 'short' && `/${SHORT_SUMMARY_LIMIT.toLocaleString()}`} ตัวอักษร)
+                  </span>
+                </summary>
+                {tooLong && (
+                  <p className="mt-2 text-xs text-danger">
+                    ยาวเกินที่ IG ส่งได้ในข้อความเดียว ลองย่อชื่อเซ็ต/สถานที่
+                    หรือแบ่งเซ็ตเป็นสองช่วง
+                  </p>
+                )}
+                <pre className="mt-2 max-h-72 overflow-auto rounded-lg bg-muted p-3 font-sans text-xs whitespace-pre-wrap">
+                  {text}
+                </pre>
+              </details>
+            </div>
           )}
-          <pre className="mt-2 max-h-72 overflow-auto rounded-md bg-muted p-3 font-sans text-xs whitespace-pre-wrap">
-            {text}
-          </pre>
-        </details>
+
+          {/* ── Songs ── */}
+          <section className="flex flex-col gap-3" aria-label="รายการเพลง">
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="ค้นหาเพลงในเซ็ตนี้…"
+                  className="bg-card pl-9"
+                  aria-label="ค้นหาเพลงในเซ็ตนี้"
+                />
+              </div>
+              <Button variant="outline" onClick={() => setAdding(true)}>
+                <Plus /> เพิ่มเพลง
+              </Button>
+            </div>
+
+            {s.items.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
+                ยังไม่มีเพลงในเซ็ตนี้ กด &quot;เพิ่มเพลง&quot; เพื่อเลือกจากคลังเพลงของวง
+              </div>
+            ) : shownItems.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                ไม่มีเพลงที่ตรงกับ &quot;{query}&quot;
+              </p>
+            ) : (
+              <>
+                <SetlistItems
+                  items={shownItems}
+                  numberOf={(item) => numbers.get(item.id) ?? 0}
+                  selectedId={selectedItem?.id ?? null}
+                  reorderable={!q}
+                  onSelect={(item) => setSelectedItemId(item.id)}
+                  onReorder={reorder}
+                  onRemove={(item) => apply(window.setlistic.setlists.removeItem(item.id), true)}
+                  onEdit={updateItem}
+                  onProgress={(item, memberId, status) =>
+                    apply(window.setlistic.setlists.setProgress(item.id, memberId, status))
+                  }
+                  onPlayed={setPlayed}
+                />
+                <p className="text-xs text-muted-foreground">
+                  คลิกแถวเพื่อดูรายละเอียด · ลากที่ ⋮⋮ เพื่อจัดลำดับ (หรือโฟกัสแล้วกดลูกศร) ·
+                  ติ๊กช่องหน้าเลขลำดับเมื่อเล่นแล้ว · คลิกชื่อสมาชิกเพื่อเปลี่ยนสถานะการซ้อม
+                </p>
+              </>
+            )}
+          </section>
+        </div>
       </div>
 
-      {/* ── Songs ── */}
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-6 gap-y-2">
-            <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">
-              รายการเพลง · {s.items.length}
-            </h2>
-            {s.items.length > 0 && s.items[0].progress.length > 0 && (
-              <Meter label="ทั้งวงพร้อม" value={readyCount} total={s.items.length} tone="success" />
-            )}
-            {playedCount > 0 && (
-              <Meter label="เล่นแล้ว" value={playedCount} total={s.items.length} />
-            )}
-          </div>
-          <Button variant="outline" onClick={() => setAdding(true)}>
-            <Plus /> เพิ่มเพลง
-          </Button>
-        </div>
+      {/* ── Inspector ── */}
+      {selectedItem && (
+        <SongInspector
+          key={selectedItem.id}
+          item={selectedItem}
+          number={numbers.get(selectedItem.id) ?? 0}
+          onViewChords={() => setStage({ startItemId: selectedItem.id })}
+          onEdit={() => setEditingItem(selectedItem)}
+          onOpenYouTube={() =>
+            run(window.setlistic.system.openExternal(selectedItem.song.youtubeUrl))
+          }
+        />
+      )}
 
-        {s.items.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
-            ยังไม่มีเพลงในเซ็ตนี้ กด &quot;เพิ่มเพลง&quot; เพื่อเลือกจากคลังเพลงของวง
-          </div>
-        ) : (
-          <>
-            <SetlistItems
-              items={s.items}
-              onReorder={reorder}
-              onRemove={(item) => apply(window.setlistic.setlists.removeItem(item.id), true)}
-              onEdit={(item, input) => apply(window.setlistic.setlists.updateItem(item.id, input))}
-              onProgress={(item, memberId, status) =>
-                apply(window.setlistic.setlists.setProgress(item.id, memberId, status))
-              }
-              onPlayed={setPlayed}
-            />
-            <p className="text-xs text-muted-foreground">
-              ลากที่ไอคอน ⋮⋮ หรือกดลูกศรเพื่อจัดลำดับ · คลิกชื่อสมาชิกเพื่อเปลี่ยนสถานะการซ้อม ·
-              ติ๊กช่องใต้เลขลำดับเมื่อเล่นเพลงนั้นแล้ว
-            </p>
-          </>
-        )}
-      </section>
+      {stage && (
+        <StageMode
+          setlist={s}
+          startItemId={stage.startItemId ?? undefined}
+          onPlayed={setPlayed}
+          onClose={() => setStage(null)}
+        />
+      )}
 
-      {onStage && <StageMode setlist={s} onPlayed={setPlayed} onClose={() => setOnStage(false)} />}
+      <ItemDialog item={editingItem} onClose={() => setEditingItem(null)} onSubmit={updateItem} />
 
       <AddSongsDialog
         bandId={bandId}
@@ -467,30 +558,171 @@ function SetlistView({
   )
 }
 
-function Meter({
+/** Venue name, linked when there's a map/page link; older sets may hold a bare link as the name. */
+function Venue({ venue, venueUrl }: { venue: string; venueUrl: string }): React.JSX.Element | null {
+  const href = venueUrl || (/^https?:\/\//i.test(venue) ? venue : '')
+  const label = href === venue ? 'เปิดแผนที่' : venue || 'เปิดแผนที่'
+  if (!venue && !venueUrl) return null
+  if (!href) {
+    return (
+      <span className="inline-flex items-center gap-1">
+        <MapPin /> {venue}
+      </span>
+    )
+  }
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={href}
+      className="inline-flex items-center gap-1 underline decoration-border underline-offset-4 hover:text-primary hover:decoration-primary"
+    >
+      <MapPin /> {label} <ExternalLink className="size-3.5!" />
+    </a>
+  )
+}
+
+function SummaryTile({
   label,
   value,
-  total,
+  hint,
+  meter,
   tone = 'primary'
 }: {
   label: string
-  value: number
-  total: number
+  value: string
+  hint?: string
+  /** 0–1; draws a bar under the value. */
+  meter?: number
   tone?: 'primary' | 'success'
 }): React.JSX.Element {
   return (
-    <span className="flex items-center gap-2 text-xs text-muted-foreground">
-      {label}
-      <span className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
-        <span
-          className={`block h-full rounded-full ${tone === 'success' ? 'bg-emerald-500' : 'bg-primary'}`}
-          style={{ width: `${(value / total) * 100}%` }}
-        />
-      </span>
-      <span className="font-mono tabular-nums">
-        {value}/{total}
-      </span>
-    </span>
+    <div className="flex flex-col gap-1 rounded-xl border border-border bg-card px-3 py-2.5">
+      <dt className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+        {label}
+      </dt>
+      <dd className="font-mono text-xl leading-tight font-bold tabular-nums">{value}</dd>
+      {meter !== undefined ? (
+        <span className="h-1 overflow-hidden rounded-full bg-muted">
+          <span
+            className={`block h-full rounded-full ${tone === 'success' ? 'bg-emerald-500' : 'bg-primary'}`}
+            style={{ width: `${meter * 100}%` }}
+          />
+        </span>
+      ) : (
+        hint && <span className="truncate text-xs text-muted-foreground">{hint}</span>
+      )}
+    </div>
+  )
+}
+
+/** Right-hand panel for the song picked in the table. */
+function SongInspector({
+  item,
+  number,
+  onViewChords,
+  onEdit,
+  onOpenYouTube
+}: {
+  item: SetlistItem
+  number: number
+  onViewChords: () => void
+  onEdit: () => void
+  onOpenYouTube: () => void
+}): React.JSX.Element {
+  const { song } = item
+  const key = item.keyOverride || song.key
+  const changedKey = !!item.keyOverride && item.keyOverride !== song.key
+  const hasChords = !!song.chordUrl || !!song.content.trim()
+
+  return (
+    <aside
+      aria-label={`รายละเอียด: ${song.title}`}
+      className="hidden w-[340px] shrink-0 flex-col gap-4 overflow-y-auto border-l border-border p-4 xl:flex"
+    >
+      <header className="flex flex-col gap-2">
+        <p className="font-mono text-xs font-bold tracking-widest text-muted-foreground">
+          เพลงที่ {String(number).padStart(2, '0')}
+        </p>
+        <div>
+          <h2 className="text-xl leading-tight font-bold break-words">{song.title}</h2>
+          <p className="text-sm text-muted-foreground">{song.artist || '—'}</p>
+        </div>
+        <dl className="grid grid-cols-3 gap-2 font-mono">
+          <InspectorStat
+            label={changedKey ? `Key (เดิม ${song.key ?? '–'})` : 'Key'}
+            value={key ?? '–'}
+            accent={!!key}
+            warning={changedKey}
+          />
+          <InspectorStat label="BPM" value={song.bpm?.toString() ?? '–'} />
+          <InspectorStat label="Length" value={formatClock(song.durationSec)} />
+        </dl>
+      </header>
+
+      {(item.note || song.notes) && (
+        <section className="flex flex-col gap-1 rounded-xl border border-border bg-card p-3 text-sm">
+          {item.note && <p className="font-semibold">{item.note}</p>}
+          {song.notes && (
+            <p className="flex items-start gap-1.5 text-muted-foreground">
+              <StickyNote className="mt-0.5 size-3.5 shrink-0" /> {song.notes}
+            </p>
+          )}
+        </section>
+      )}
+
+      <section className="flex flex-col gap-2">
+        <h3 className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+          Reference
+        </h3>
+        <YouTubePlayer url={song.youtubeUrl} title={song.title} />
+      </section>
+
+      <div className="mt-auto flex flex-col gap-2">
+        <Button
+          className="h-11 w-full text-base"
+          onClick={onViewChords}
+          title={hasChords ? 'เปิดคอร์ดเต็มจอที่เพลงนี้' : 'เพลงนี้ยังไม่มีคอร์ด'}
+        >
+          <FileMusic /> ดูคอร์ด
+        </Button>
+        <div className="grid grid-cols-2 gap-2">
+          <Button variant="outline" disabled={!song.youtubeUrl} onClick={onOpenYouTube}>
+            <ExternalLink /> YouTube
+          </Button>
+          <Button variant="outline" onClick={onEdit}>
+            <Pencil /> คีย์ / โน้ต
+          </Button>
+        </div>
+      </div>
+    </aside>
+  )
+}
+
+function InspectorStat({
+  label,
+  value,
+  accent,
+  warning
+}: {
+  label: string
+  value: string
+  accent?: boolean
+  warning?: boolean
+}): React.JSX.Element {
+  const tone = warning
+    ? 'border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400'
+    : accent
+      ? 'border-primary bg-primary text-primary-foreground'
+      : 'border-border bg-card'
+  return (
+    <div className={`flex flex-col rounded-lg border px-2 py-1.5 ${tone}`}>
+      <dt className="truncate font-sans text-[10px] font-semibold tracking-wider uppercase opacity-70">
+        {label}
+      </dt>
+      <dd className="text-lg leading-tight font-bold">{value}</dd>
+    </div>
   )
 }
 
@@ -595,6 +827,7 @@ function SetlistFormDialog({
             eventDate: str('eventDate') || null,
             eventTime: str('eventTime') || null,
             venue: str('venue'),
+            venueUrl: str('venueUrl'),
             notes: str('notes')
           })
         }}
@@ -619,13 +852,28 @@ function SetlistFormDialog({
           </Select>
         </Field>
         <Field label="สถานที่">
-          <Input name="venue" maxLength={200} defaultValue={setlist?.venue} />
+          <Input
+            name="venue"
+            maxLength={200}
+            defaultValue={setlist?.venue}
+            placeholder="เช่น ห้องซ้อม Studio A"
+          />
         </Field>
         <Field label="วันที่">
           <Input name="eventDate" type="date" defaultValue={setlist?.eventDate ?? ''} />
         </Field>
         <Field label="เวลา">
           <Input name="eventTime" type="time" defaultValue={setlist?.eventTime ?? ''} />
+        </Field>
+        <Field label="ลิงก์สถานที่ (Google Maps, เพจร้าน ฯลฯ)" className="col-span-2">
+          <Input
+            name="venueUrl"
+            type="url"
+            pattern="https?://.+"
+            title="ลิงก์ต้องขึ้นต้นด้วย http:// หรือ https://"
+            defaultValue={setlist?.venueUrl}
+            placeholder="https://maps.app.goo.gl/…"
+          />
         </Field>
         <Field label="หมายเหตุ" className="col-span-2">
           <Textarea name="notes" rows={2} maxLength={5000} defaultValue={setlist?.notes} />

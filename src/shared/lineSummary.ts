@@ -50,6 +50,14 @@ export function shareUrl(url: string): string {
   }
 }
 
+/** 📍 name, with the map link on its own line so chat apps make it tappable. */
+function venueLines({ venue, venueUrl }: SetlistDetail): string[] {
+  const lines: string[] = []
+  if (venue) lines.push(`📍 ${shareUrl(venue)}`) // older sets may have pasted a link here
+  if (venueUrl) lines.push(venue ? `🗺️ ${shareUrl(venueUrl)}` : `📍 ${shareUrl(venueUrl)}`)
+  return lines
+}
+
 const NUMBER_EMOJI = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟']
 const DIVIDER = '━━━━━━━━━━━━━━'
 
@@ -80,7 +88,7 @@ export function generateLineSummary(
   lines.push(`${KIND_LABEL[setlist.kind]} | ${setlist.name}`)
   if (bandName) lines.push(`🎶 วง ${bandName}`)
   if (setlist.eventDate) lines.push(`📅 ${formatThaiDate(setlist.eventDate, setlist.eventTime)}`)
-  if (setlist.venue) lines.push(`📍 ${shareUrl(setlist.venue)}`)
+  lines.push(...venueLines(setlist))
   lines.push(
     `🎵 ทั้งหมด ${setlist.items.length} เพลง` +
       (setlist.totalSec > 0 ? ` (~${formatTotal(setlist.totalSec)})` : '')
@@ -152,7 +160,7 @@ function buildShortSummary(
   // ── Event ──
   lines.push(`${KIND_LABEL[setlist.kind]} | ${setlist.name}${bandName ? ` | 🎶 ${bandName}` : ''}`)
   if (setlist.eventDate) lines.push(`📅 ${formatThaiDate(setlist.eventDate, setlist.eventTime)}`)
-  if (setlist.venue) lines.push(`📍 ${shareUrl(setlist.venue)}`)
+  lines.push(...venueLines(setlist))
 
   // ── Songs ──
   lines.push(
@@ -165,19 +173,32 @@ function buildShortSummary(
   setlist.items.forEach((item, i) => {
     const { song } = item
     const key = item.keyOverride || song.key
+
+    // จัดรูปแบบ Key พร้อมวงเล็บกรณีมี keyOverride
     const keyText = key
-      ? ` 🎼${key}${item.keyOverride && song.key && item.keyOverride !== song.key ? ` (เดิม ${song.key})` : ''}`
+      ? ` 🎼 Key ${key}${item.keyOverride && song.key && item.keyOverride !== song.key ? ` (เดิม ${song.key})` : ''}`
       : ''
+
+    // รายชื่อสมาชิกที่ยังไม่พร้อม
     const notReady = includeProgress
       ? item.progress.filter((p) => p.status !== 'ready').map((p) => p.member.name)
       : []
-    const waiting = notReady.length ? ` ⏳${notReady.join(', ')}` : ''
+    const waiting = notReady.length ? ` ⏳ ${notReady.join(', ')}` : ''
+
+    // หมายเลขลำดับแบบเติมเลข 0 ข้างหน้า (01, 02, ...)
     const no = `${String(i + 1).padStart(2, '0')}.`
 
     if (stacked) {
-      lines.push(`${no} ${song.title}${keyText}`)
-      if (song.artist || waiting) lines.push(`      ${song.artist}${waiting}`)
+      // บรรทัดที่ 1: ลำดับ + ชื่อเพลง + ศิลปิน
+      lines.push(`${no} ${song.title}${song.artist ? ` - ${song.artist}` : ''}`)
+
+      // บรรทัดที่ 2: Key และสถานะการซ้อม (แสดงเฉพาะที่มีข้อมูล)
+      const subInfo = `${keyText}${waiting}`.trim()
+      if (subInfo) {
+        lines.push(`    ${subInfo}`) // เคาะเว้นวรรคย่อหน้าเล็กน้อยเพื่อให้ดูสวยงาม
+      }
     } else {
+      // โหมดบรรทัดเดียวจบ
       lines.push(`${no} ${song.title}${song.artist ? ` – ${song.artist}` : ''}${keyText}${waiting}`)
     }
   })

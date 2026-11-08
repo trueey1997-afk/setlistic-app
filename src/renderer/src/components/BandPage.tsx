@@ -78,7 +78,7 @@ export function BandPage({
   const band = useAsync(() => window.setlistic.bands.get(bandId), `band:${bandId}`)
   const [editingMember, setEditingMember] = useState<Member | 'new' | null>(null)
 
-  if (!band.data) return <p className="p-6 text-primary">{band.error}</p>
+  if (!band.data) return <p className="p-6 text-danger">{band.error}</p>
   const b = band.data
 
   async function save(task: Promise<Band>): Promise<boolean> {

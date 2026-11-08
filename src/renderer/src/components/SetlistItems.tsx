@@ -16,7 +16,7 @@ import {
   verticalListSortingStrategy
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Check, ChevronDown, ChevronUp, Circle, Clock, GripVertical, Pencil, X } from 'lucide-react'
+import { Check, Circle, Clock, GripVertical, Pencil, X } from 'lucide-react'
 import {
   MUSICAL_KEYS,
   PRACTICE_STATUS_LABEL,
@@ -29,7 +29,6 @@ import {
 import { formatClock } from '@shared/format'
 import { isItemReady } from '@shared/lineSummary'
 import { KeyChords } from './KeyChords'
-import { SongLinks } from './links'
 import { Badge, Button, Dialog, Field, Input, Select } from './ui'
 
 const NEXT_STATUS: Record<PracticeStatus, PracticeStatus> = {
@@ -44,8 +43,16 @@ const STATUS_CHIP: Record<PracticeStatus, string> = {
   ready: 'border-emerald-500/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
 }
 
+/** Grip · # · song · key · BPM · time · actions; shared by the header and every row. */
+const COLUMNS =
+  'grid grid-cols-[2rem_2.75rem_minmax(0,1fr)_4rem_3.5rem_3.5rem_4.5rem] items-center gap-2'
+
 export function SetlistItems({
   items,
+  numberOf,
+  selectedId,
+  reorderable = true,
+  onSelect,
   onReorder,
   onRemove,
   onEdit,
@@ -53,6 +60,12 @@ export function SetlistItems({
   onPlayed
 }: {
   items: SetlistItem[]
+  /** Running-order number, which stays put while the list is filtered. */
+  numberOf: (item: SetlistItem) => number
+  selectedId: number | null
+  /** Off while the list is filtered, since a move needs the whole order. */
+  reorderable?: boolean
+  onSelect: (item: SetlistItem) => void
   onReorder: (items: SetlistItem[]) => void
   onRemove: (item: SetlistItem) => void
   onEdit: (item: SetlistItem, input: SetlistItemInput) => void
@@ -65,60 +78,87 @@ export function SetlistItems({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
 
-  function move(from: number, to: number): void {
-    if (to < 0 || to >= items.length) return
-    onReorder(arrayMove(items, from, to))
-  }
-
   function onDragEnd({ active, over }: DragEndEvent): void {
     if (!over || active.id === over.id) return
-    move(
-      items.findIndex((it) => it.id === active.id),
-      items.findIndex((it) => it.id === over.id)
+    onReorder(
+      arrayMove(
+        items,
+        items.findIndex((it) => it.id === active.id),
+        items.findIndex((it) => it.id === over.id)
+      )
     )
   }
 
   return (
     <>
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-        <SortableContext items={items.map((it) => it.id)} strategy={verticalListSortingStrategy}>
-          <ol className="flex flex-col gap-2">
-            {items.map((item, i) => (
-              <Row
-                key={item.id}
-                item={item}
-                index={i}
-                last={i === items.length - 1}
-                onUp={() => move(i, i - 1)}
-                onDown={() => move(i, i + 1)}
-                onEdit={() => setEditing(item)}
-                onRemove={() => onRemove(item)}
-                onProgress={(memberId, status) => onProgress(item, memberId, status)}
-                onPlayed={(played) => onPlayed(item, played)}
-              />
-            ))}
-          </ol>
-        </SortableContext>
-      </DndContext>
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
+        <div
+          aria-hidden
+          className={`${COLUMNS} border-b border-border px-2 py-2 text-[10px] font-bold tracking-widest text-muted-foreground uppercase`}
+        >
+          <span />
+          <span className="text-center">#</span>
+          <span>เพลง</span>
+          <span className="text-center">Key</span>
+          <span className="text-right">BPM</span>
+          <span className="text-right">Time</span>
+          <span />
+        </div>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+          <SortableContext items={items.map((it) => it.id)} strategy={verticalListSortingStrategy}>
+            <ol className="divide-y divide-border">
+              {items.map((item) => (
+                <Row
+                  key={item.id}
+                  item={item}
+                  number={numberOf(item)}
+                  selected={item.id === selectedId}
+                  reorderable={reorderable}
+                  onSelect={() => onSelect(item)}
+                  onEdit={() => setEditing(item)}
+                  onRemove={() => onRemove(item)}
+                  onProgress={(memberId, status) => onProgress(item, memberId, status)}
+                  onPlayed={(played) => onPlayed(item, played)}
+                />
+              ))}
+            </ol>
+          </SortableContext>
+        </DndContext>
+      </div>
 
-      <Dialog
-        open={editing !== null}
-        onClose={() => setEditing(null)}
-        title={editing ? `ตั้งค่า: ${editing.song.title}` : ''}
-      >
-        {editing && (
-          <ItemForm
-            key={editing.id}
-            item={editing}
-            onCancel={() => setEditing(null)}
-            onSubmit={(input) => {
-              onEdit(editing, input)
-              setEditing(null)
-            }}
-          />
-        )}
-      </Dialog>
+      <ItemDialog item={editing} onClose={() => setEditing(null)} onSubmit={onEdit} />
     </>
+  )
+}
+
+/** Dialog around the per-setlist key and note form. */
+export function ItemDialog({
+  item,
+  onClose,
+  onSubmit
+}: {
+  item: SetlistItem | null
+  onClose: () => void
+  onSubmit: (item: SetlistItem, input: SetlistItemInput) => void
+}): React.JSX.Element {
+  return (
+    <Dialog
+      open={item !== null}
+      onClose={onClose}
+      title={item ? `ตั้งค่า: ${item.song.title}` : ''}
+    >
+      {item && (
+        <ItemForm
+          key={item.id}
+          item={item}
+          onCancel={onClose}
+          onSubmit={(input) => {
+            onSubmit(item, input)
+            onClose()
+          }}
+        />
+      )}
+    </Dialog>
   )
 }
 
@@ -177,20 +217,20 @@ function ItemForm({
 
 function Row({
   item,
-  index,
-  last,
-  onUp,
-  onDown,
+  number,
+  selected,
+  reorderable,
+  onSelect,
   onEdit,
   onRemove,
   onProgress,
   onPlayed
 }: {
   item: SetlistItem
-  index: number
-  last: boolean
-  onUp: () => void
-  onDown: () => void
+  number: number
+  selected: boolean
+  reorderable: boolean
+  onSelect: () => void
   onEdit: () => void
   onRemove: () => void
   onProgress: (memberId: number, status: PracticeStatus) => void
@@ -204,7 +244,7 @@ function Row({
     transform,
     transition,
     isDragging
-  } = useSortable({ id: item.id })
+  } = useSortable({ id: item.id, disabled: !reorderable })
   const { song } = item
   const key = item.keyOverride || song.key
   const changedKey = !!item.keyOverride && item.keyOverride !== song.key
@@ -213,98 +253,113 @@ function Row({
     <li
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`flex gap-2 rounded-lg border bg-card p-3 ${
+      onClick={onSelect}
+      className={`group relative cursor-pointer border-l-2 ${
         isDragging
-          ? 'relative z-10 border-primary shadow-xl'
-          : isItemReady(item)
-            ? 'border-emerald-500/40'
-            : 'border-border'
+          ? 'z-10 border-primary bg-muted shadow-xl'
+          : selected
+            ? 'border-primary bg-muted'
+            : 'border-transparent hover:bg-muted/50'
       }`}
     >
-      <div className="flex shrink-0 flex-col items-center">
+      <div className={`${COLUMNS} px-2 py-2`}>
+        {/* Arrow keys move the row once the grip has focus (dnd-kit keyboard sensor) */}
         <button
           ref={setActivatorNodeRef}
           {...attributes}
           {...listeners}
-          className="cursor-grab touch-none rounded p-1 text-muted-foreground hover:text-foreground active:cursor-grabbing"
+          disabled={!reorderable}
+          onClick={(e) => e.stopPropagation()}
+          className="cursor-grab touch-none rounded p-1 text-muted-foreground hover:text-foreground active:cursor-grabbing disabled:cursor-default disabled:opacity-25"
           aria-label={`ลากเพื่อย้าย ${song.title}`}
+          title={reorderable ? 'ลากเพื่อจัดลำดับ' : 'ล้างช่องค้นหาก่อนจึงจัดลำดับได้'}
         >
           <GripVertical className="size-4" />
         </button>
-        <button
-          onClick={onUp}
-          disabled={index === 0}
-          className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-25"
-          aria-label="เลื่อนขึ้น"
-        >
-          <ChevronUp className="size-4" />
-        </button>
-        <button
-          onClick={onDown}
-          disabled={last}
-          className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-25"
-          aria-label="เลื่อนลง"
-        >
-          <ChevronDown className="size-4" />
-        </button>
-      </div>
 
-      <label className="flex shrink-0 cursor-pointer flex-col items-center gap-2 pt-0.5">
-        <span
-          className={`w-9 text-center font-mono text-2xl leading-none font-bold tabular-nums ${
-            item.played ? 'text-muted-foreground' : 'text-primary'
-          }`}
-        >
-          {String(index + 1).padStart(2, '0')}
-        </span>
-        <input
-          type="checkbox"
-          checked={item.played}
-          onChange={(e) => onPlayed(e.target.checked)}
-          className="size-5 cursor-pointer accent-primary"
-          aria-label={`เล่นแล้ว: ${song.title}`}
+        <label
+          className="flex cursor-pointer items-center justify-center gap-1.5"
+          onClick={(e) => e.stopPropagation()}
           title="ติ๊กเมื่อเล่นเพลงนี้แล้ว"
-        />
-      </label>
-
-      <div className={`flex min-w-0 flex-1 flex-col gap-2 ${item.played ? 'opacity-50' : ''}`}>
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className={`truncate font-semibold ${item.played ? 'line-through' : ''}`}>
-              {song.title}
-            </p>
-            <p className="truncate text-sm text-muted-foreground">{song.artist || '—'}</p>
-          </div>
-          <div className="flex shrink-0">
-            <Button variant="ghost" onClick={onEdit} aria-label="ตั้งค่าคีย์และโน้ต">
-              <Pencil />
-            </Button>
-            <Button variant="ghost" onClick={onRemove} aria-label="เอาออกจากเซ็ตลิสต์">
-              <X />
-            </Button>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-1.5 font-mono">
-          {key && (
-            <Badge tone={changedKey ? 'warning' : 'primary'}>
-              Key {key}
-              {changedKey && ' (เปลี่ยน)'}
-            </Badge>
-          )}
-          {song.bpm && <Badge>{song.bpm} BPM</Badge>}
-          <Badge>{formatClock(song.durationSec)}</Badge>
-          <span className="font-sans">
-            <SongLinks youtubeUrl={song.youtubeUrl} chordUrl={song.chordUrl} />
+        >
+          <input
+            type="checkbox"
+            checked={item.played}
+            onChange={(e) => onPlayed(e.target.checked)}
+            className="size-3.5 cursor-pointer accent-primary"
+            aria-label={`เล่นแล้ว: ${song.title}`}
+          />
+          <span
+            className={`font-mono text-sm font-bold tabular-nums ${
+              item.played ? 'text-muted-foreground' : ''
+            }`}
+          >
+            {String(number).padStart(2, '0')}
           </span>
+        </label>
+
+        <div className={`min-w-0 ${item.played ? 'opacity-50' : ''}`}>
+          <p className={`truncate text-sm font-semibold ${item.played ? 'line-through' : ''}`}>
+            {isItemReady(item) && (
+              <Check className="mr-1 inline size-3.5 text-emerald-500" aria-label="ทั้งวงพร้อม" />
+            )}
+            {song.title}
+          </p>
+          <p className="truncate text-xs text-muted-foreground">
+            {song.artist || '—'}
+            {item.note && <span className="text-foreground"> · {item.note}</span>}
+          </p>
         </div>
 
-        {item.note && <p className="border-l-2 border-primary pl-2 text-sm">{item.note}</p>}
+        <div className="flex justify-center">
+          {key ? (
+            <Badge
+              tone={changedKey ? 'warning' : 'key'}
+              className="min-w-10 justify-center font-mono text-sm"
+            >
+              {key}
+            </Badge>
+          ) : (
+            <span className="font-mono text-muted-foreground">–</span>
+          )}
+        </div>
+        <span className="text-right font-mono text-sm font-bold tabular-nums">
+          {song.bpm ?? <span className="text-muted-foreground">–</span>}
+        </span>
+        <span className="text-right font-mono text-sm text-muted-foreground tabular-nums">
+          {formatClock(song.durationSec)}
+        </span>
 
-        {item.progress.length > 0 && (
-          <ProgressChips progress={item.progress} onChange={onProgress} />
-        )}
+        <div
+          className={`flex justify-end focus-within:opacity-100 group-hover:opacity-100 ${
+            selected ? '' : 'opacity-0'
+          }`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={onEdit}
+            aria-label="ตั้งค่าคีย์และโน้ต"
+            title="ตั้งค่าคีย์และโน้ต"
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-background hover:text-foreground"
+          >
+            <Pencil className="size-4" />
+          </button>
+          <button
+            onClick={onRemove}
+            aria-label="เอาออกจากเซ็ตลิสต์"
+            title="เอาออกจากเซ็ตลิสต์"
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-danger/10 hover:text-danger"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
       </div>
+
+      {item.progress.length > 0 && (
+        <div className="pr-2 pb-2 pl-[6.25rem]" onClick={(e) => e.stopPropagation()}>
+          <ProgressChips progress={item.progress} onChange={onProgress} />
+        </div>
+      )}
     </li>
   )
 }
@@ -318,7 +373,7 @@ function ProgressChips({
   onChange: (memberId: number, status: PracticeStatus) => void
 }): React.JSX.Element {
   return (
-    <ul className="flex flex-wrap gap-1 border-t border-border pt-2">
+    <ul className="flex flex-wrap gap-1">
       {progress.map((p) => {
         const Icon = STATUS_ICON[p.status]
         return (
@@ -326,7 +381,7 @@ function ProgressChips({
             <button
               onClick={() => onChange(p.member.id, NEXT_STATUS[p.status])}
               title={`${p.member.name}: ${PRACTICE_STATUS_LABEL[p.status]} (คลิกเพื่อเปลี่ยน)`}
-              className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-semibold ${STATUS_CHIP[p.status]}`}
+              className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold ${STATUS_CHIP[p.status]}`}
             >
               <Icon className="size-3" />
               {p.member.name}

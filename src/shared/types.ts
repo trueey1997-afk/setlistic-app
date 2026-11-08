@@ -127,6 +127,8 @@ export interface SetlistSummary {
   /** HH:MM, or null. */
   eventTime: string | null
   venue: string
+  /** Map or venue page; empty when none. */
+  venueUrl: string
   songCount: number
   /** Sum of known song durations. */
   totalSec: number
@@ -163,6 +165,7 @@ export interface SetlistInput {
   eventDate: string | null
   eventTime: string | null
   venue: string
+  venueUrl: string
   notes: string
 }
 

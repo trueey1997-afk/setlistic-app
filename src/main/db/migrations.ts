@@ -137,6 +137,11 @@ const MIGRATIONS: string[] = [
   // 3: tick off songs as they're played during the show
   `
   ALTER TABLE setlist_songs ADD COLUMN played INTEGER NOT NULL DEFAULT 0 CHECK (played IN (0, 1));
+  `,
+
+  // 4: a map/info link beside the venue name
+  `
+  ALTER TABLE setlists ADD COLUMN venue_url TEXT NOT NULL DEFAULT '';
   `
 ]
 

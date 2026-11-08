@@ -163,9 +163,7 @@ function SongForm({
       </Field>
 
       {error && (
-        <p className="col-span-4 rounded-md bg-primary/10 px-3 py-2 text-sm text-primary">
-          {error}
-        </p>
+        <p className="col-span-4 rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>
       )}
       <div className="col-span-4 flex justify-end gap-2">
         <Button type="button" variant="ghost" onClick={onCancel}>

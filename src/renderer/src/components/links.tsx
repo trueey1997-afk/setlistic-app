@@ -37,7 +37,7 @@ export function SongLinks({
     <span className="inline-flex items-center gap-0.5">
       {youtubeUrl && (
         <ExternalA href={youtubeUrl}>
-          <CirclePlay className="text-primary" /> YouTube
+          <CirclePlay className="text-danger" /> YouTube
         </ExternalA>
       )}
       {chordUrl && (

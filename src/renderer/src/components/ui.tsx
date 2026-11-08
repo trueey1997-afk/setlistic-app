@@ -5,7 +5,7 @@ const BUTTON_VARIANTS = {
   primary: 'bg-primary text-primary-foreground hover:bg-primary-hover',
   outline: 'border border-border hover:bg-muted',
   ghost: 'text-muted-foreground hover:bg-muted hover:text-foreground',
-  danger: 'text-primary hover:bg-primary/10'
+  danger: 'text-danger hover:bg-danger/10'
 } as const
 
 export function Button({
@@ -21,7 +21,7 @@ export function Button({
 }): React.JSX.Element {
   return (
     <button
-      className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-md px-3.5 text-sm font-semibold whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0 ${BUTTON_VARIANTS[variant]} ${className}`}
+      className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-3.5 text-sm font-semibold whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0 ${BUTTON_VARIANTS[variant]} ${className}`}
       disabled={disabled || loading}
       {...props}
     >
@@ -32,7 +32,7 @@ export function Button({
 }
 
 const CONTROL =
-  'w-full rounded-md border border-border bg-background px-3 text-sm placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none'
+  'w-full rounded-lg border border-border bg-background px-3 text-sm placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none'
 
 export function Input({
   className = '',
@@ -97,7 +97,7 @@ export function Dialog({
     <dialog
       ref={ref}
       onClose={onClose}
-      className="m-auto w-[min(720px,calc(100%-2rem))] rounded-lg border border-border bg-card p-0 text-foreground shadow-2xl"
+      className="m-auto w-[min(720px,calc(100%-2rem))] rounded-xl border border-border bg-card p-0 text-foreground shadow-2xl"
     >
       {open && (
         <div className="flex max-h-[90vh] flex-col">
@@ -121,6 +121,8 @@ export function Dialog({
 const BADGE_TONES = {
   neutral: 'border-border text-muted-foreground',
   primary: 'border-primary/50 text-primary',
+  /** Solid accent, for the musical key */
+  key: 'border-primary bg-primary text-primary-foreground',
   success: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
   warning: 'border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400'
 } as const
@@ -137,7 +139,7 @@ export function Badge({
 }): React.JSX.Element {
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs font-semibold whitespace-nowrap ${BADGE_TONES[tone]} ${className}`}
+      className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs font-semibold whitespace-nowrap ${BADGE_TONES[tone]} ${className}`}
     >
       {children}
     </span>

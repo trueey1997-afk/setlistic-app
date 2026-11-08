@@ -88,7 +88,7 @@ function App(): React.JSX.Element {
               </button>
             )}
             <span className="flex items-center gap-2 text-sm font-bold tracking-[0.2em] uppercase">
-              <img src={logo} alt="" className="size-8 rounded-md" />
+              {/* <img src={logo} alt="" className="size-8 rounded-md" /> */}
               Setlistic
             </span>
             {band && (
@@ -142,7 +142,7 @@ function App(): React.JSX.Element {
         </header>
 
         {bands.error ? (
-          <p className="p-6 text-primary">{bands.error}</p>
+          <p className="p-6 text-danger">{bands.error}</p>
         ) : !bands.data ? null : !band || creatingBand ? (
           <BandOnboarding
             first={!band}

@@ -69,6 +69,7 @@ const setlistInput = z.object({
     .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'เวลาไม่ถูกต้อง')
     .nullable(),
   venue: text(200),
+  venueUrl: link,
   notes: text(5_000)
 })
 

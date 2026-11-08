@@ -1,11 +1,13 @@
 {
   "[typescript]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
+    "editor.defaultFormatter": "TypeScriptTeam.native-preview"
   },
   "[javascript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "[json]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
-  }
+  },
+  // PowerShell blocks npm.ps1 under the default execution policy; cmd runs npm.cmd
+  "terminal.integrated.defaultProfile.windows": "Command Prompt"
 }

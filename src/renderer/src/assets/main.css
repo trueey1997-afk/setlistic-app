@@ -12,22 +12,26 @@
   --muted: #ededed;
   --muted-foreground: #666666;
   --border: #dddddd;
-  --primary: #d11f25;
-  --primary-hover: #b3181d;
+  /* Lime darkened enough to read as text on white */
+  --primary: #4d7c0f;
+  --primary-hover: #3f6212;
   --primary-foreground: #ffffff;
+  --danger: #dc2626;
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --background: #0d0d0d;
-  --foreground: #ececec;
-  --card: #151515;
-  --muted: #1f1f1f;
-  --muted-foreground: #8e8e8e;
-  --border: #2a2a2a;
-  --primary: #e0282e;
-  --primary-hover: #c71f25;
-  --primary-foreground: #ffffff;
+  --background: #0f1115;
+  --foreground: #ffffff;
+  --card: #1a1d24;
+  --muted: #242832;
+  --muted-foreground: #9ca3af;
+  --border: #2a2e37;
+  /* Electric lime with near-black text: actions, active states, keys */
+  --primary: #d4ff00;
+  --primary-hover: #bfe600;
+  --primary-foreground: #0f1115;
+  --danger: #f05252;
 }
 
 @theme inline {
@@ -40,6 +44,7 @@
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
+  --color-danger: var(--danger);
   /* System fonts only, so the app looks right with no internet */
   --font-sans: 'Segoe UI', 'Leelawadee UI', 'Noto Sans Thai', system-ui, sans-serif;
   --font-mono: 'Cascadia Mono', Consolas, 'Noto Sans Mono', ui-monospace, monospace;
@@ -61,7 +66,7 @@ body {
 
 ::selection {
   background: var(--primary);
-  color: #fff;
+  color: var(--primary-foreground);
 }
 
 dialog::backdrop {

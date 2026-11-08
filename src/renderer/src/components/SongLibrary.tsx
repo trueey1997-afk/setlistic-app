@@ -118,7 +118,7 @@ export function SongLibrary({
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           {songs.error ? (
-            <p className="p-4 text-sm text-primary">{songs.error}</p>
+            <p className="p-4 text-sm text-danger">{songs.error}</p>
           ) : !songs.data ? null : songs.data.length === 0 ? (
             <p className="p-6 text-center text-sm text-muted-foreground">
               {search || key || status

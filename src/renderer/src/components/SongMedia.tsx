@@ -1,5 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import {
+  AspectRatio,
+  Box,
+  Button,
+  Flex,
+  HStack,
+  IconButton,
+  SegmentGroup,
+  Slider,
+  Stack,
+  Text,
+  type SystemStyleObject
+} from '@chakra-ui/react'
+import {
   AArrowDown,
   AArrowUp,
   ArrowLeft,
@@ -20,23 +33,43 @@ export function YouTubePlayer({ url, title }: { url: string; title: string }): R
   const id = getYouTubeId(url)
   if (!id) {
     return (
-      <div className="flex aspect-video w-full shrink-0 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
-        <CirclePlay className="size-6" />
-        {url ? 'ลิงก์ YouTube นี้เล่นในแอปไม่ได้' : 'ยังไม่มีลิงก์ YouTube'}
-      </div>
+      <AspectRatio ratio={16 / 9} w="full" flexShrink={0}>
+        <Stack
+          align="center"
+          justify="center"
+          gap="2"
+          rounded="lg"
+          borderWidth="1px"
+          borderStyle="dashed"
+          p="4"
+          textAlign="center"
+          fontSize="sm"
+          color="fg.muted"
+        >
+          <CirclePlay size={24} />
+          {url ? 'ลิงก์ YouTube นี้เล่นในแอปไม่ได้' : 'ยังไม่มีลิงก์ YouTube'}
+        </Stack>
+      </AspectRatio>
     )
   }
   return (
-    <div className="aspect-video w-full shrink-0 overflow-hidden rounded-lg border border-border bg-black">
+    <AspectRatio
+      ratio={16 / 9}
+      w="full"
+      flexShrink={0}
+      overflow="hidden"
+      rounded="lg"
+      borderWidth="1px"
+      bg="black"
+    >
       <iframe
         src={`https://www.youtube-nocookie.com/embed/${id}?rel=0`}
         title={`YouTube: ${title}`}
         allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
         allowFullScreen
         referrerPolicy="strict-origin-when-cross-origin"
-        className="size-full"
       />
-    </div>
+    </AspectRatio>
   )
 }
 
@@ -54,8 +87,17 @@ const SPEED = { min: 5, max: 150, fallback: 30 } // px per second
 const SIZE = { min: 60, max: 250, step: 10, fallback: 100 } // percent
 const BASE_FONT_PX = 15
 
+/** Container query for the song page's side-by-side layout (Tailwind's old `@3xl`). */
+export const WIDE = '@container (min-width: 48rem)'
+
 /** Fills the screen beside the sticky player; a fixed share of it when stacked. */
-const PANE_HEIGHT = 'h-[70vh] min-h-80 @3xl:h-[calc(100vh-12rem)]'
+const PANE_HEIGHT = {
+  h: '70vh',
+  minH: '80',
+  css: { [WIDE]: { height: 'calc(100vh - 12rem)' } } satisfies SystemStyleObject
+} as const
+/** Takes the rest of a flex column (stage mode). */
+const FILL = { minH: '0', flex: '1' } as const
 
 function useStoredNumber(
   key: string,
@@ -115,7 +157,7 @@ export function ChordPane({
   /** Take the rest of a flex column (stage mode) instead of a fixed height. */
   fill?: boolean
 }): React.JSX.Element {
-  const height = fill ? 'min-h-0 flex-1' : PANE_HEIGHT
+  const height = fill ? FILL : PANE_HEIGHT
   const [source, setSource] = useState<'web' | 'text'>(chordUrl ? 'web' : 'text')
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useStoredNumber('setlistic-scroll-speed', SPEED)
@@ -142,45 +184,77 @@ export function ChordPane({
 
   if (!chordUrl && !content) {
     return (
-      <div className="flex h-60 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-        <FileText className="size-6" />
+      <Stack
+        h="60"
+        align="center"
+        justify="center"
+        gap="2"
+        rounded="lg"
+        borderWidth="1px"
+        borderStyle="dashed"
+        p="6"
+        textAlign="center"
+        fontSize="sm"
+        color="fg.muted"
+      >
+        <FileText size={24} />
         ยังไม่มีลิงก์คอร์ด กด &quot;แก้ไข&quot; แล้วใส่ &quot;ลิงก์คอร์ด / Sheet&quot;
         เพื่อดูคอร์ดในแอป
-      </div>
+      </Stack>
     )
   }
 
   return (
-    <div className={`flex flex-col gap-2 ${fill ? 'min-h-0 flex-1' : ''}`}>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-border bg-card px-2 py-1.5">
-        <button
+    <Stack gap="2" {...(fill ? FILL : {})}>
+      <Flex
+        wrap="wrap"
+        align="center"
+        columnGap="4"
+        rowGap="2"
+        rounded="lg"
+        borderWidth="1px"
+        bg="bg.panel"
+        px="2"
+        py="1.5"
+      >
+        <Button
+          size="xs"
+          h="8"
+          px="3"
           onClick={() => setPlaying(!playing)}
           aria-pressed={playing}
-          className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-sm font-semibold [&_svg]:size-4 ${
-            playing
-              ? 'bg-primary text-primary-foreground hover:bg-primary-hover'
-              : 'border border-border hover:bg-muted'
-          }`}
+          variant={playing ? 'solid' : 'outline'}
+          colorPalette={playing ? 'brand' : 'gray'}
         >
           {playing ? <Pause /> : <Play />}
           {playing ? 'หยุดเลื่อน' : 'เลื่อนอัตโนมัติ'}
-        </button>
+        </Button>
 
-        <label className="flex items-center gap-2 text-xs text-muted-foreground" title="ความเร็ว">
-          <Gauge className="size-4 shrink-0" />
-          <input
-            type="range"
+        <HStack gap="2" fontSize="xs" color="fg.muted" title="ความเร็ว">
+          <Gauge size={16} />
+          <Slider.Root
+            w="28"
+            size="sm"
+            colorPalette="brand"
             min={SPEED.min}
             max={SPEED.max}
-            value={speed}
-            onChange={(e) => setSpeed(Number(e.target.value))}
-            aria-label="ความเร็วการเลื่อน"
-            className="w-28 accent-primary"
-          />
-          <span className="w-8 font-mono tabular-nums">{speed}</span>
-        </label>
+            value={[speed]}
+            onValueChange={(e) => setSpeed(e.value[0])}
+            aria-label={['ความเร็วการเลื่อน']}
+          >
+            <Slider.Control>
+              <Slider.Track>
+                <Slider.Range />
+              </Slider.Track>
+              <Slider.Thumbs />
+            </Slider.Control>
+          </Slider.Root>
+          <Text as="span" w="8" fontFamily="mono" fontVariantNumeric="tabular-nums">
+            {speed}
+          </Text>
+        </HStack>
 
-        <div className="flex items-center gap-0.5" role="group" aria-label="ขนาดตัวอักษร">
+        <HStack gap="0.5" role="group" aria-label="ขนาดตัวอักษร">
           <ToolbarButton
             label="ตัวอักษรเล็กลง"
             disabled={size <= SIZE.min}
@@ -188,13 +262,19 @@ export function ChordPane({
           >
             <AArrowDown />
           </ToolbarButton>
-          <button
+          <Button
+            variant="ghost"
+            size="xs"
+            w="12"
             onClick={() => setSize(SIZE.fallback)}
             title="ขนาดปกติ"
-            className="w-12 rounded py-1 font-mono text-xs text-muted-foreground tabular-nums hover:bg-muted hover:text-foreground"
+            fontFamily="mono"
+            fontWeight="normal"
+            color="fg.muted"
+            fontVariantNumeric="tabular-nums"
           >
             {size}%
-          </button>
+          </Button>
           <ToolbarButton
             label="ตัวอักษรใหญ่ขึ้น"
             disabled={size >= SIZE.max}
@@ -202,32 +282,61 @@ export function ChordPane({
           >
             <AArrowUp />
           </ToolbarButton>
-        </div>
+        </HStack>
 
         {chordUrl && content && (
-          <div className="ml-auto flex rounded-md border border-border p-0.5 text-xs font-semibold">
-            <SourceTab active={source === 'web'} onClick={() => setSource('web')}>
-              <Globe /> เว็บคอร์ด
-            </SourceTab>
-            <SourceTab active={source === 'text'} onClick={() => setSource('text')}>
-              <FileText /> เนื้อเพลง
-            </SourceTab>
-          </div>
+          <SegmentGroup.Root
+            ml="auto"
+            size="xs"
+            value={source}
+            onValueChange={(e) => setSource(e.value as 'web' | 'text')}
+          >
+            <SegmentGroup.Indicator />
+            <SegmentGroup.Items
+              items={[
+                {
+                  value: 'web',
+                  label: (
+                    <HStack gap="1">
+                      <Globe size={14} /> เว็บคอร์ด
+                    </HStack>
+                  )
+                },
+                {
+                  value: 'text',
+                  label: (
+                    <HStack gap="1">
+                      <FileText size={14} /> เนื้อเพลง
+                    </HStack>
+                  )
+                }
+              ]}
+            />
+          </SegmentGroup.Root>
         )}
-      </div>
+      </Flex>
 
       {source === 'web' ? (
         <ChordWeb key={chordUrl} ref={webviewRef} url={chordUrl} zoom={size / 100} fill={fill} />
       ) : (
-        <pre
+        <Box
+          as="pre"
           ref={textRef}
           style={{ fontSize: (BASE_FONT_PX * size) / 100 }}
-          className={`${height} overflow-y-auto rounded-lg border border-border bg-card p-5 font-mono leading-relaxed whitespace-pre-wrap`}
+          overflowY="auto"
+          rounded="lg"
+          borderWidth="1px"
+          bg="bg.panel"
+          p="5"
+          fontFamily="mono"
+          lineHeight="relaxed"
+          whiteSpace="pre-wrap"
+          {...height}
         >
           {content}
-        </pre>
+        </Box>
       )}
-    </div>
+    </Stack>
   )
 }
 
@@ -275,14 +384,20 @@ function ChordWeb({
   }, [ref])
 
   return (
-    <div
-      className={`flex flex-col overflow-hidden rounded-lg border border-border ${fill ? 'min-h-0 flex-1' : ''}`}
+    <Flex
+      direction="column"
+      overflow="hidden"
+      rounded="lg"
+      borderWidth="1px"
+      {...(fill ? FILL : {})}
     >
-      <div className="flex items-center gap-1 border-b border-border bg-muted/40 px-2 py-1">
-        <Globe className="mx-1 size-4 shrink-0 text-muted-foreground" />
-        <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
+      <HStack gap="1" borderBottomWidth="1px" bg="bg.subtle" px="2" py="1">
+        <Box mx="1" flexShrink={0} color="fg.muted">
+          <Globe size={16} />
+        </Box>
+        <Text minW="0" flex="1" truncate fontFamily="mono" fontSize="xs" color="fg.muted">
           {url}
-        </span>
+        </Text>
         <ToolbarButton label="ย้อนกลับ" disabled={!canGoBack} onClick={() => ref.current?.goBack()}>
           <ArrowLeft />
         </ToolbarButton>
@@ -292,38 +407,17 @@ function ChordWeb({
         <ExternalA href={url}>
           <ExternalLink /> เปิดในเบราว์เซอร์
         </ExternalA>
-      </div>
-      <webview
-        ref={ref}
-        src={url}
-        // Own cookie jar, kept apart from the app and the YouTube player
-        // eslint-disable-next-line react/no-unknown-property
-        partition="persist:chords"
-        className={`${fill ? 'min-h-0 flex-1' : PANE_HEIGHT} w-full bg-white`}
-      />
-    </div>
-  )
-}
-
-function SourceTab({
-  active,
-  onClick,
-  children
-}: {
-  active: boolean
-  onClick: () => void
-  children: React.ReactNode
-}): React.JSX.Element {
-  return (
-    <button
-      onClick={onClick}
-      aria-pressed={active}
-      className={`inline-flex items-center gap-1 rounded px-2 py-1 [&_svg]:size-3.5 ${
-        active ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'
-      }`}
-    >
-      {children}
-    </button>
+      </HStack>
+      <Box asChild w="full" bg="white" {...(fill ? FILL : PANE_HEIGHT)}>
+        <webview
+          ref={ref}
+          src={url}
+          // Own cookie jar, kept apart from the app and the YouTube player
+          // eslint-disable-next-line react/no-unknown-property
+          partition="persist:chords"
+        />
+      </Box>
+    </Flex>
   )
 }
 
@@ -339,14 +433,16 @@ function ToolbarButton({
   children: React.ReactNode
 }): React.JSX.Element {
   return (
-    <button
+    <IconButton
+      variant="ghost"
+      size="xs"
+      color="fg.muted"
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
       title={label}
-      className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40 [&_svg]:size-4"
     >
       {children}
-    </button>
+    </IconButton>
   )
 }

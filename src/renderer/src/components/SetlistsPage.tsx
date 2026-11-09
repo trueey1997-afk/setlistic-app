@@ -1,5 +1,28 @@
 import { useState } from 'react'
 import {
+  Box,
+  Button,
+  Center,
+  Checkbox,
+  chakra,
+  Collapsible,
+  Flex,
+  Grid,
+  Heading,
+  HStack,
+  IconButton,
+  Input,
+  Link,
+  NativeSelect,
+  Progress,
+  SegmentGroup,
+  Span,
+  Stack,
+  Text,
+  Textarea,
+  Wrap
+} from '@chakra-ui/react'
+import {
   CalendarDays,
   Check,
   CirclePlay,
@@ -11,7 +34,6 @@ import {
   Pencil,
   Play,
   Plus,
-  Search,
   Send,
   Share2,
   StickyNote,
@@ -43,11 +65,11 @@ import { StageMode } from './StageMode'
 import { YouTubePlayer } from './SongMedia'
 import { SongStatusBadge } from './links'
 import { useRun, useToast } from './toast'
-import { Badge, Button, Dialog, EmptyState, Field, Input, Select, SidePane, Textarea } from './ui'
+import { Badge, Dialog, EmptyState, Field, ListRow, SearchGroup, SidePane } from './ui'
 
-const SUMMARY_FORMATS: [SummaryFormat, string][] = [
-  ['full', 'LINE (ละเอียด)'],
-  ['short', 'สั้น (IG / Messenger)']
+const SUMMARY_FORMATS: { value: SummaryFormat; label: string }[] = [
+  { value: 'full', label: 'LINE (ละเอียด)' },
+  { value: 'short', label: 'สั้น (IG / Messenger)' }
 ]
 
 /** Local date as YYYY-MM-DD, comparable with `eventDate`. */
@@ -68,6 +90,15 @@ function groupSetlists(list: SetlistSummary[]): { label: string; items: SetlistS
   ].filter((g) => g.items.length > 0)
 }
 
+/** Tiny uppercase caption used on tiles and panel headings. */
+const CAPTION = {
+  fontSize: '10px',
+  fontWeight: 'bold',
+  letterSpacing: 'widest',
+  textTransform: 'uppercase',
+  color: 'fg.muted'
+} as const
+
 export function SetlistsPage({
   bandId,
   bandName,
@@ -86,24 +117,36 @@ export function SetlistsPage({
   const activeId = selectedId ?? groups[0]?.items[0]?.id ?? null
 
   return (
-    <div className="flex min-h-0 flex-1">
-      <SidePane open={sidebarOpen} label="รายการเซ็ตลิสต์" className="w-[340px]">
-        <div className="border-b border-border p-3">
-          <Button className="w-full" onClick={() => setCreating(true)}>
+    <Flex minH="0" flex="1">
+      <SidePane open={sidebarOpen} label="รายการเซ็ตลิสต์" w="340px">
+        <Box borderBottomWidth="1px" p="3">
+          <Button colorPalette="brand" w="full" onClick={() => setCreating(true)}>
             <Plus /> สร้างเซ็ตลิสต์
           </Button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        </Box>
+        <Box minH="0" flex="1" overflowY="auto">
           {setlists.data?.length === 0 && (
-            <p className="p-6 text-center text-sm text-muted-foreground">
+            <Text p="6" textAlign="center" fontSize="sm" color="fg.muted">
               ยังไม่มีเซ็ตลิสต์ สร้างสำหรับวันซ้อมหรือวันเล่นได้เลย
-            </p>
+            </Text>
           )}
           {groups.map((g) => (
             <section key={g.label} aria-label={g.label}>
-              <h3 className="sticky top-0 z-[1] bg-background/95 px-3 pt-3 pb-1 text-[11px] font-bold tracking-widest text-muted-foreground uppercase backdrop-blur">
+              <Text
+                as="h3"
+                position="sticky"
+                top="0"
+                zIndex="1"
+                bg="bg/95"
+                backdropFilter="blur(8px)"
+                px="3"
+                pt="3"
+                pb="1"
+                {...CAPTION}
+                fontSize="11px"
+              >
                 {g.label} · {g.items.length}
-              </h3>
+              </Text>
               <ul>
                 {g.items.map((s) => (
                   <li key={s.id}>
@@ -117,10 +160,10 @@ export function SetlistsPage({
               </ul>
             </section>
           ))}
-        </div>
+        </Box>
       </SidePane>
 
-      <section className="flex min-w-0 flex-1">
+      <Flex as="section" minW="0" flex="1">
         {activeId ? (
           <SetlistView
             key={activeId}
@@ -136,7 +179,7 @@ export function SetlistsPage({
         ) : (
           <EmptyState icon={<ListMusic />} title="เลือกเซ็ตลิสต์ หรือสร้างใหม่" />
         )}
-      </section>
+      </Flex>
 
       <SetlistFormDialog
         open={creating}
@@ -149,7 +192,7 @@ export function SetlistsPage({
           setlists.reload()
         }}
       />
-    </div>
+    </Flex>
   )
 }
 
@@ -165,47 +208,53 @@ function SetlistRow({
   const date = s.eventDate ? new Date(`${s.eventDate}T00:00:00`) : null
   const isToday = s.eventDate === todayString()
   return (
-    <button
-      onClick={onClick}
-      aria-current={selected}
-      className={`flex w-full items-center gap-3 border-l-2 px-3 py-2.5 text-left ${
-        selected ? 'border-primary bg-muted' : 'border-transparent hover:bg-muted/60'
-      }`}
-    >
-      <span
-        className={`flex w-12 shrink-0 flex-col items-center rounded border py-1 leading-tight ${
-          s.kind === 'gig'
-            ? 'border-primary bg-primary text-primary-foreground'
-            : 'border-border bg-background'
-        }`}
+    <ListRow selected={selected} onClick={onClick}>
+      <Stack
+        w="12"
+        flexShrink={0}
+        align="center"
+        gap="0"
+        rounded="sm"
+        borderWidth="1px"
+        py="1"
+        lineHeight="short"
+        {...(s.kind === 'gig'
+          ? { borderColor: 'brand.solid', bg: 'brand.solid', color: 'brand.contrast' }
+          : { bg: 'bg' })}
       >
         {date ? (
           <>
-            <span className="font-mono text-lg font-bold">{date.getDate()}</span>
-            <span className="text-[10px] font-semibold opacity-80">
+            <Text fontFamily="mono" fontSize="lg" fontWeight="bold">
+              {date.getDate()}
+            </Text>
+            <Text fontSize="10px" fontWeight="semibold" opacity={0.8}>
               {date.toLocaleDateString('th-TH', { month: 'short' })}
-            </span>
+            </Text>
           </>
         ) : (
-          <span className="py-2 text-xs">–</span>
+          <Text py="2" fontSize="xs">
+            –
+          </Text>
         )}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-1.5">
-          <span className="truncate text-sm font-semibold">{s.name}</span>
+      </Stack>
+      <Box minW="0" flex="1">
+        <HStack gap="1.5">
+          <Text truncate fontSize="sm" fontWeight="semibold">
+            {s.name}
+          </Text>
           {isToday && <Badge tone="primary">วันนี้</Badge>}
-        </span>
-        <span className="block truncate text-xs text-muted-foreground">
+        </HStack>
+        <Text truncate fontSize="xs" color="fg.muted">
           {SETLIST_KIND_LABEL[s.kind]}
           {s.eventTime && ` · ${s.eventTime}`}
           {s.venue && ` · ${s.venue}`}
-        </span>
-      </span>
-      <span className="shrink-0 text-right font-mono text-xs text-muted-foreground">
-        <span className="block">{s.songCount} เพลง</span>
-        {s.totalSec > 0 && <span className="block">{formatTotal(s.totalSec)}</span>}
-      </span>
-    </button>
+        </Text>
+      </Box>
+      <Box flexShrink={0} textAlign="right" fontFamily="mono" fontSize="xs" color="fg.muted">
+        <Text>{s.songCount} เพลง</Text>
+        {s.totalSec > 0 && <Text>{formatTotal(s.totalSec)}</Text>}
+      </Box>
+    </ListRow>
   )
 }
 
@@ -236,7 +285,12 @@ function SetlistView({
   // Item to open stage mode on; null picks up at the first unplayed song
   const [stage, setStage] = useState<{ startItemId: number | null } | null>(null)
 
-  if (!setlist.data) return <p className="p-6 text-danger">{setlist.error}</p>
+  if (!setlist.data)
+    return (
+      <Text p="6" color="fg.error">
+        {setlist.error}
+      </Text>
+    )
   const s = setlist.data
   const selectedItem = s.items.find((it) => it.id === selectedItemId) ?? s.items[0]
   const q = query.trim().toLowerCase()
@@ -284,30 +338,37 @@ function SetlistView({
   const numbers = new Map(s.items.map((it, i) => [it.id, i + 1]))
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1">
+    <Flex minH="0" minW="0" flex="1">
       {/* ── Workspace ── */}
-      <div className="min-w-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex max-w-5xl flex-col gap-4 p-6">
-          <header className="flex flex-wrap items-start justify-between gap-4">
-            <div className="flex min-w-0 flex-col gap-1.5">
-              <div className="flex items-center gap-2">
+      <Box minW="0" flex="1" overflowY="auto">
+        <Stack mx="auto" maxW="5xl" gap="4" p="6">
+          <Flex as="header" wrap="wrap" align="flex-start" justify="space-between" gap="4">
+            <Stack minW="0" gap="1.5">
+              <HStack gap="2">
                 <Badge tone={s.kind === 'gig' ? 'primary' : 'neutral'}>
                   {SETLIST_KIND_LABEL[s.kind]}
                 </Badge>
-                <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground [&_svg]:size-4">
+                <Wrap columnGap="4" rowGap="1" fontSize="sm" color="fg.muted">
                   {s.eventDate && (
-                    <span className="inline-flex items-center gap-1">
-                      <CalendarDays /> {formatThaiDate(s.eventDate, s.eventTime)}
-                    </span>
+                    <HStack as="span" gap="1">
+                      <CalendarDays size={16} /> {formatThaiDate(s.eventDate, s.eventTime)}
+                    </HStack>
                   )}
                   <Venue venue={s.venue} venueUrl={s.venueUrl} />
-                </p>
-              </div>
-              <h1 className="text-3xl font-bold break-words">{s.name}</h1>
-              {s.notes && <p className="text-sm text-muted-foreground">{s.notes}</p>}
-            </div>
-            <div className="flex shrink-0 gap-1">
+                </Wrap>
+              </HStack>
+              <Heading size="3xl" wordBreak="break-word">
+                {s.name}
+              </Heading>
+              {s.notes && (
+                <Text fontSize="sm" color="fg.muted">
+                  {s.notes}
+                </Text>
+              )}
+            </Stack>
+            <HStack flexShrink={0} gap="1">
               <Button
+                colorPalette="brand"
                 disabled={s.items.length === 0}
                 onClick={() => setStage({ startItemId: null })}
                 title="เต็มจอ ตัวใหญ่ เปลี่ยนเพลงด้วยลูกศรหรือ pedal"
@@ -315,18 +376,23 @@ function SetlistView({
                 <Play /> เล่นสด
               </Button>
               <Button
-                variant="outline"
+                variant={sharing ? 'subtle' : 'outline'}
                 aria-expanded={sharing}
                 onClick={() => setSharing(!sharing)}
-                className={sharing ? 'bg-muted' : ''}
               >
                 <Share2 /> แชร์
               </Button>
-              <Button variant="ghost" onClick={() => setEditing(true)} aria-label="แก้ไขเซ็ตลิสต์">
+              <IconButton
+                variant="ghost"
+                color="fg.muted"
+                onClick={() => setEditing(true)}
+                aria-label="แก้ไขเซ็ตลิสต์"
+              >
                 <Pencil />
-              </Button>
-              <Button
-                variant="danger"
+              </IconButton>
+              <IconButton
+                variant="ghost"
+                colorPalette="red"
                 aria-label="ลบเซ็ตลิสต์"
                 onClick={async () => {
                   if (!confirm(`ลบเซ็ตลิสต์ "${s.name}"?`)) return
@@ -334,12 +400,12 @@ function SetlistView({
                 }}
               >
                 <Trash2 />
-              </Button>
-            </div>
-          </header>
+              </IconButton>
+            </HStack>
+          </Flex>
 
           {/* ── Summary ── */}
-          <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <Grid as="dl" templateColumns={{ base: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' }} gap="2">
             <SummaryTile label="เพลงทั้งหมด" value={String(s.items.length)} />
             <SummaryTile
               label="ความยาวรวม"
@@ -365,32 +431,20 @@ function SetlistView({
               value={`${playedCount}/${s.items.length}`}
               meter={s.items.length ? playedCount / s.items.length : 0}
             />
-          </dl>
+          </Grid>
 
           {/* ── Share tools ── */}
           {sharing && (
-            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-3">
-              <div
-                role="radiogroup"
+            <Wrap align="center" gap="2" rounded="xl" borderWidth="1px" bg="bg.panel" p="3">
+              <SegmentGroup.Root
+                size="sm"
+                value={format}
+                onValueChange={(e) => setFormat(e.value as SummaryFormat)}
                 aria-label="รูปแบบข้อความ"
-                className="flex rounded-lg border border-border p-0.5 text-xs font-semibold"
               >
-                {SUMMARY_FORMATS.map(([value, label]) => (
-                  <button
-                    key={value}
-                    role="radio"
-                    aria-checked={format === value}
-                    onClick={() => setFormat(value)}
-                    className={`rounded-md px-2.5 py-1.5 ${
-                      format === value
-                        ? 'bg-muted text-foreground'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+                <SegmentGroup.Indicator />
+                <SegmentGroup.Items items={SUMMARY_FORMATS} fontWeight="semibold" />
+              </SegmentGroup.Root>
               <Button
                 variant="outline"
                 disabled={s.items.length === 0}
@@ -429,63 +483,92 @@ function SetlistView({
               >
                 <CirclePlay /> YouTube Playlist{playlist && ` (${playlist.videoCount})`}
               </Button>
-              <label className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
-                <input
-                  type="checkbox"
-                  checked={includeProgress}
-                  onChange={(e) => setIncludeProgress(e.target.checked)}
-                  className="size-4 accent-primary"
-                />
-                แนบสถานะการซ้อม
-              </label>
-              <details className="w-full text-sm">
-                <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+              <Checkbox.Root
+                ml="auto"
+                size="sm"
+                colorPalette="brand"
+                checked={includeProgress}
+                onCheckedChange={(e) => setIncludeProgress(e.checked === true)}
+              >
+                <Checkbox.HiddenInput />
+                <Checkbox.Control />
+                <Checkbox.Label color="fg.muted" fontWeight="normal">
+                  แนบสถานะการซ้อม
+                </Checkbox.Label>
+              </Checkbox.Root>
+              <Collapsible.Root w="full" fontSize="sm">
+                <Collapsible.Trigger
+                  cursor="pointer"
+                  color="fg.muted"
+                  _hover={{ color: 'fg' }}
+                  textAlign="left"
+                >
                   ดูตัวอย่างข้อความ{' '}
-                  <span className={`font-mono text-xs ${tooLong ? 'text-danger' : ''}`}>
+                  <Span fontFamily="mono" fontSize="xs" color={tooLong ? 'fg.error' : undefined}>
                     ({text.length.toLocaleString()}
                     {format === 'short' && `/${SHORT_SUMMARY_LIMIT.toLocaleString()}`} ตัวอักษร)
-                  </span>
-                </summary>
-                {tooLong && (
-                  <p className="mt-2 text-xs text-danger">
-                    ยาวเกินที่ IG ส่งได้ในข้อความเดียว ลองย่อชื่อเซ็ต/สถานที่
-                    หรือแบ่งเซ็ตเป็นสองช่วง
-                  </p>
-                )}
-                <pre className="mt-2 max-h-72 overflow-auto rounded-lg bg-muted p-3 font-sans text-xs whitespace-pre-wrap">
-                  {text}
-                </pre>
-              </details>
-            </div>
+                  </Span>
+                </Collapsible.Trigger>
+                <Collapsible.Content>
+                  {tooLong && (
+                    <Text mt="2" fontSize="xs" color="fg.error">
+                      ยาวเกินที่ IG ส่งได้ในข้อความเดียว ลองย่อชื่อเซ็ต/สถานที่
+                      หรือแบ่งเซ็ตเป็นสองช่วง
+                    </Text>
+                  )}
+                  <Box
+                    as="pre"
+                    mt="2"
+                    maxH="72"
+                    overflow="auto"
+                    rounded="lg"
+                    bg="bg.muted"
+                    p="3"
+                    fontFamily="body"
+                    fontSize="xs"
+                    whiteSpace="pre-wrap"
+                  >
+                    {text}
+                  </Box>
+                </Collapsible.Content>
+              </Collapsible.Root>
+            </Wrap>
           )}
 
           {/* ── Songs ── */}
-          <section className="flex flex-col gap-3" aria-label="รายการเพลง">
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Stack as="section" gap="3" aria-label="รายการเพลง">
+            <HStack gap="2">
+              <SearchGroup>
                 <Input
                   type="search"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="ค้นหาเพลงในเซ็ตนี้…"
-                  className="bg-card pl-9"
+                  bg="bg.panel"
                   aria-label="ค้นหาเพลงในเซ็ตนี้"
                 />
-              </div>
+              </SearchGroup>
               <Button variant="outline" onClick={() => setAdding(true)}>
                 <Plus /> เพิ่มเพลง
               </Button>
-            </div>
+            </HStack>
 
             {s.items.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
+              <Box
+                rounded="xl"
+                borderWidth="1px"
+                borderStyle="dashed"
+                p="10"
+                textAlign="center"
+                fontSize="sm"
+                color="fg.muted"
+              >
                 ยังไม่มีเพลงในเซ็ตนี้ กด &quot;เพิ่มเพลง&quot; เพื่อเลือกจากคลังเพลงของวง
-              </div>
+              </Box>
             ) : shownItems.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">
+              <Text py="8" textAlign="center" fontSize="sm" color="fg.muted">
                 ไม่มีเพลงที่ตรงกับ &quot;{query}&quot;
-              </p>
+              </Text>
             ) : (
               <>
                 <SetlistItems
@@ -502,15 +585,15 @@ function SetlistView({
                   }
                   onPlayed={setPlayed}
                 />
-                <p className="text-xs text-muted-foreground">
+                <Text fontSize="xs" color="fg.muted">
                   คลิกแถวเพื่อดูรายละเอียด · ลากที่ ⋮⋮ เพื่อจัดลำดับ (หรือโฟกัสแล้วกดลูกศร) ·
                   ติ๊กช่องหน้าเลขลำดับเมื่อเล่นแล้ว · คลิกชื่อสมาชิกเพื่อเปลี่ยนสถานะการซ้อม
-                </p>
+                </Text>
               </>
             )}
-          </section>
-        </div>
-      </div>
+          </Stack>
+        </Stack>
+      </Box>
 
       {/* ── Inspector ── */}
       {selectedItem && (
@@ -554,7 +637,7 @@ function SetlistView({
           setEditing(false)
         }}
       />
-    </div>
+    </Flex>
   )
 }
 
@@ -565,21 +648,28 @@ function Venue({ venue, venueUrl }: { venue: string; venueUrl: string }): React.
   if (!venue && !venueUrl) return null
   if (!href) {
     return (
-      <span className="inline-flex items-center gap-1">
-        <MapPin /> {venue}
-      </span>
+      <HStack as="span" gap="1">
+        <MapPin size={16} /> {venue}
+      </HStack>
     )
   }
   return (
-    <a
+    <Link
       href={href}
       target="_blank"
       rel="noopener noreferrer"
       title={href}
-      className="inline-flex items-center gap-1 underline decoration-border underline-offset-4 hover:text-primary hover:decoration-primary"
+      display="inline-flex"
+      alignItems="center"
+      gap="1"
+      color="inherit"
+      textDecoration="underline"
+      textDecorationColor="border"
+      textUnderlineOffset="4px"
+      _hover={{ color: 'brand.fg', textDecorationColor: 'brand.fg' }}
     >
-      <MapPin /> {label} <ExternalLink className="size-3.5!" />
-    </a>
+      <MapPin size={16} /> {label} <ExternalLink size={14} />
+    </Link>
   )
 }
 
@@ -598,22 +688,39 @@ function SummaryTile({
   tone?: 'primary' | 'success'
 }): React.JSX.Element {
   return (
-    <div className="flex flex-col gap-1 rounded-xl border border-border bg-card px-3 py-2.5">
-      <dt className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+    <Stack gap="1" rounded="xl" borderWidth="1px" bg="bg.panel" px="3" py="2.5">
+      <Text as="dt" {...CAPTION}>
         {label}
-      </dt>
-      <dd className="font-mono text-xl leading-tight font-bold tabular-nums">{value}</dd>
+      </Text>
+      <Text
+        as="dd"
+        fontFamily="mono"
+        fontSize="xl"
+        lineHeight="shorter"
+        fontWeight="bold"
+        fontVariantNumeric="tabular-nums"
+      >
+        {value}
+      </Text>
       {meter !== undefined ? (
-        <span className="h-1 overflow-hidden rounded-full bg-muted">
-          <span
-            className={`block h-full rounded-full ${tone === 'success' ? 'bg-emerald-500' : 'bg-primary'}`}
-            style={{ width: `${meter * 100}%` }}
-          />
-        </span>
+        <Progress.Root
+          value={meter * 100}
+          size="xs"
+          colorPalette={tone === 'success' ? 'green' : 'brand'}
+          aria-label={label}
+        >
+          <Progress.Track rounded="full" bg="bg.muted">
+            <Progress.Range rounded="full" />
+          </Progress.Track>
+        </Progress.Root>
       ) : (
-        hint && <span className="truncate text-xs text-muted-foreground">{hint}</span>
+        hint && (
+          <Text truncate fontSize="xs" color="fg.muted">
+            {hint}
+          </Text>
+        )
       )}
-    </div>
+    </Stack>
   )
 }
 
@@ -637,19 +744,36 @@ function SongInspector({
   const hasChords = !!song.chordUrl || !!song.content.trim()
 
   return (
-    <aside
+    <Stack
+      as="aside"
       aria-label={`รายละเอียด: ${song.title}`}
-      className="hidden w-[340px] shrink-0 flex-col gap-4 overflow-y-auto border-l border-border p-4 xl:flex"
+      display={{ base: 'none', xl: 'flex' }}
+      w="340px"
+      flexShrink={0}
+      gap="4"
+      overflowY="auto"
+      borderLeftWidth="1px"
+      p="4"
     >
-      <header className="flex flex-col gap-2">
-        <p className="font-mono text-xs font-bold tracking-widest text-muted-foreground">
+      <Stack as="header" gap="2">
+        <Text
+          fontFamily="mono"
+          fontSize="xs"
+          fontWeight="bold"
+          letterSpacing="widest"
+          color="fg.muted"
+        >
           เพลงที่ {String(number).padStart(2, '0')}
-        </p>
-        <div>
-          <h2 className="text-xl leading-tight font-bold break-words">{song.title}</h2>
-          <p className="text-sm text-muted-foreground">{song.artist || '—'}</p>
-        </div>
-        <dl className="grid grid-cols-3 gap-2 font-mono">
+        </Text>
+        <Box>
+          <Heading as="h2" size="xl" lineHeight="shorter" wordBreak="break-word">
+            {song.title}
+          </Heading>
+          <Text fontSize="sm" color="fg.muted">
+            {song.artist || '—'}
+          </Text>
+        </Box>
+        <Grid as="dl" templateColumns="repeat(3, 1fr)" gap="2" fontFamily="mono">
           <InspectorStat
             label={changedKey ? `Key (เดิม ${song.key ?? '–'})` : 'Key'}
             value={key ?? '–'}
@@ -658,45 +782,58 @@ function SongInspector({
           />
           <InspectorStat label="BPM" value={song.bpm?.toString() ?? '–'} />
           <InspectorStat label="Length" value={formatClock(song.durationSec)} />
-        </dl>
-      </header>
+        </Grid>
+      </Stack>
 
       {(item.note || song.notes) && (
-        <section className="flex flex-col gap-1 rounded-xl border border-border bg-card p-3 text-sm">
-          {item.note && <p className="font-semibold">{item.note}</p>}
+        <Stack
+          as="section"
+          gap="1"
+          rounded="xl"
+          borderWidth="1px"
+          bg="bg.panel"
+          p="3"
+          fontSize="sm"
+        >
+          {item.note && <Text fontWeight="semibold">{item.note}</Text>}
           {song.notes && (
-            <p className="flex items-start gap-1.5 text-muted-foreground">
-              <StickyNote className="mt-0.5 size-3.5 shrink-0" /> {song.notes}
-            </p>
+            <HStack align="flex-start" gap="1.5" color="fg.muted">
+              <Box mt="0.5" flexShrink={0}>
+                <StickyNote size={14} />
+              </Box>
+              {song.notes}
+            </HStack>
           )}
-        </section>
+        </Stack>
       )}
 
-      <section className="flex flex-col gap-2">
-        <h3 className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+      <Stack as="section" gap="2">
+        <Text as="h3" {...CAPTION}>
           Reference
-        </h3>
+        </Text>
         <YouTubePlayer url={song.youtubeUrl} title={song.title} />
-      </section>
+      </Stack>
 
-      <div className="mt-auto flex flex-col gap-2">
+      <Stack mt="auto" gap="2">
         <Button
-          className="h-11 w-full text-base"
+          colorPalette="brand"
+          size="lg"
+          w="full"
           onClick={onViewChords}
           title={hasChords ? 'เปิดคอร์ดเต็มจอที่เพลงนี้' : 'เพลงนี้ยังไม่มีคอร์ด'}
         >
           <FileMusic /> ดูคอร์ด
         </Button>
-        <div className="grid grid-cols-2 gap-2">
+        <Grid templateColumns="repeat(2, 1fr)" gap="2">
           <Button variant="outline" disabled={!song.youtubeUrl} onClick={onOpenYouTube}>
             <ExternalLink /> YouTube
           </Button>
           <Button variant="outline" onClick={onEdit}>
             <Pencil /> คีย์ / โน้ต
           </Button>
-        </div>
-      </div>
-    </aside>
+        </Grid>
+      </Stack>
+    </Stack>
   )
 }
 
@@ -712,17 +849,28 @@ function InspectorStat({
   warning?: boolean
 }): React.JSX.Element {
   const tone = warning
-    ? 'border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400'
+    ? { borderColor: 'orange.muted', bg: 'orange.subtle', color: 'orange.fg' }
     : accent
-      ? 'border-primary bg-primary text-primary-foreground'
-      : 'border-border bg-card'
+      ? { borderColor: 'brand.solid', bg: 'brand.solid', color: 'brand.contrast' }
+      : { bg: 'bg.panel' }
   return (
-    <div className={`flex flex-col rounded-lg border px-2 py-1.5 ${tone}`}>
-      <dt className="truncate font-sans text-[10px] font-semibold tracking-wider uppercase opacity-70">
+    <Stack gap="0" rounded="lg" borderWidth="1px" px="2" py="1.5" {...tone}>
+      <Text
+        as="dt"
+        truncate
+        fontFamily="body"
+        fontSize="10px"
+        fontWeight="semibold"
+        letterSpacing="wider"
+        textTransform="uppercase"
+        opacity={0.7}
+      >
         {label}
-      </dt>
-      <dd className="text-lg leading-tight font-bold">{value}</dd>
-    </div>
+      </Text>
+      <Text as="dd" fontSize="lg" lineHeight="shorter" fontWeight="bold">
+        {value}
+      </Text>
+    </Stack>
   )
 }
 
@@ -747,56 +895,60 @@ function AddSongsDialog({
 
   return (
     <Dialog open={open} onClose={onClose} title="เพิ่มเพลงจากคลัง">
-      <div className="flex flex-col gap-3">
-        <div className="relative">
-          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+      <Stack gap="3">
+        <SearchGroup>
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="ค้นหาเพลง"
-            className="pl-8"
             autoFocus
           />
-        </div>
+        </SearchGroup>
         {songs.data?.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">
+          <Text py="6" textAlign="center" fontSize="sm" color="fg.muted">
             ไม่พบเพลง เพิ่มเพลงในแท็บ &quot;เพลง&quot; ก่อน
-          </p>
+          </Text>
         ) : (
-          <ul className="flex max-h-[55vh] flex-col divide-y divide-border overflow-y-auto">
+          <Stack as="ul" gap="0" maxH="55vh" divideY="1px" overflowY="auto">
             {songs.data?.map((song) => {
               const added = inSetlist.has(song.id)
               return (
                 <li key={song.id}>
-                  <button
+                  <chakra.button
                     onClick={() => onAdd(song.id)}
-                    className="flex w-full items-center gap-3 px-2 py-2 text-left hover:bg-muted"
+                    display="flex"
+                    w="full"
+                    alignItems="center"
+                    gap="3"
+                    px="2"
+                    py="2"
+                    textAlign="left"
+                    cursor="pointer"
+                    _hover={{ bg: 'bg.muted' }}
                   >
-                    <span
-                      className={`flex size-7 shrink-0 items-center justify-center rounded ${
-                        added ? 'text-emerald-500' : 'text-primary'
-                      }`}
-                    >
-                      {added ? <Check className="size-4" /> : <Plus className="size-4" />}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold">{song.title}</span>
-                      <span className="block truncate text-xs text-muted-foreground">
+                    <Center boxSize="7" flexShrink={0} color={added ? 'green.500' : 'brand.fg'}>
+                      {added ? <Check size={16} /> : <Plus size={16} />}
+                    </Center>
+                    <Box minW="0" flex="1">
+                      <Text truncate fontSize="sm" fontWeight="semibold">
+                        {song.title}
+                      </Text>
+                      <Text truncate fontSize="xs" color="fg.muted">
                         {song.artist || '—'}
-                      </span>
-                    </span>
+                      </Text>
+                    </Box>
                     {song.key && <Badge tone="primary">{song.key}</Badge>}
                     <SongStatusBadge status={song.status} />
-                  </button>
+                  </chakra.button>
                 </li>
               )
             })}
-          </ul>
+          </Stack>
         )}
-        <p className="text-xs text-muted-foreground">
+        <Text fontSize="xs" color="fg.muted">
           คลิกเพื่อเพิ่มต่อท้ายเซ็ต (เพิ่มเพลงเดิมซ้ำได้ เช่น เพลง encore)
-        </p>
-      </div>
+        </Text>
+      </Stack>
     </Dialog>
   )
 }
@@ -814,9 +966,11 @@ function SetlistFormDialog({
 }): React.JSX.Element {
   return (
     <Dialog open={open} onClose={onClose} title={setlist ? 'แก้ไขเซ็ตลิสต์' : 'สร้างเซ็ตลิสต์'}>
-      <form
+      <chakra.form
         key={setlist?.id ?? 'new'}
-        className="grid grid-cols-2 gap-4"
+        display="grid"
+        gridTemplateColumns="repeat(2, minmax(0, 1fr))"
+        gap="4"
         onSubmit={(e) => {
           e.preventDefault()
           const f = new FormData(e.currentTarget)
@@ -832,7 +986,7 @@ function SetlistFormDialog({
           })
         }}
       >
-        <Field label="ชื่อ *" className="col-span-2">
+        <Field label="ชื่อ *" gridColumn="span 2">
           <Input
             name="name"
             required
@@ -843,13 +997,16 @@ function SetlistFormDialog({
           />
         </Field>
         <Field label="ประเภท">
-          <Select name="kind" defaultValue={setlist?.kind ?? 'rehearsal'}>
-            {SETLIST_KINDS.map((k) => (
-              <option key={k} value={k}>
-                {SETLIST_KIND_LABEL[k]}
-              </option>
-            ))}
-          </Select>
+          <NativeSelect.Root>
+            <NativeSelect.Field name="kind" defaultValue={setlist?.kind ?? 'rehearsal'}>
+              {SETLIST_KINDS.map((k) => (
+                <option key={k} value={k}>
+                  {SETLIST_KIND_LABEL[k]}
+                </option>
+              ))}
+            </NativeSelect.Field>
+            <NativeSelect.Indicator />
+          </NativeSelect.Root>
         </Field>
         <Field label="สถานที่">
           <Input
@@ -865,7 +1022,7 @@ function SetlistFormDialog({
         <Field label="เวลา">
           <Input name="eventTime" type="time" defaultValue={setlist?.eventTime ?? ''} />
         </Field>
-        <Field label="ลิงก์สถานที่ (Google Maps, เพจร้าน ฯลฯ)" className="col-span-2">
+        <Field label="ลิงก์สถานที่ (Google Maps, เพจร้าน ฯลฯ)" gridColumn="span 2">
           <Input
             name="venueUrl"
             type="url"
@@ -875,16 +1032,18 @@ function SetlistFormDialog({
             placeholder="https://maps.app.goo.gl/…"
           />
         </Field>
-        <Field label="หมายเหตุ" className="col-span-2">
+        <Field label="หมายเหตุ" gridColumn="span 2">
           <Textarea name="notes" rows={2} maxLength={5000} defaultValue={setlist?.notes} />
         </Field>
-        <div className="col-span-2 flex justify-end gap-2">
+        <HStack gridColumn="span 2" justify="flex-end" gap="2">
           <Button type="button" variant="ghost" onClick={onClose}>
             ยกเลิก
           </Button>
-          <Button type="submit">บันทึก</Button>
-        </div>
-      </form>
+          <Button type="submit" colorPalette="brand">
+            บันทึก
+          </Button>
+        </HStack>
+      </chakra.form>
     </Dialog>
   )
 }

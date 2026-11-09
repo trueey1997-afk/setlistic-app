@@ -1,3 +1,4 @@
+import { HStack, Link, type LinkProps } from '@chakra-ui/react'
 import { CirclePlay, ExternalLink, FileMusic } from 'lucide-react'
 import { SONG_STATUS_LABEL, type SongStatus } from '@shared/types'
 import { Badge, type BadgeTone } from './ui'
@@ -5,23 +6,31 @@ import { Badge, type BadgeTone } from './ui'
 /** External link: setWindowOpenHandler in main sends it to the system browser. */
 export function ExternalA({
   href,
-  className = '',
-  children
-}: {
-  href: string
-  className?: string
-  children: React.ReactNode
-}): React.JSX.Element {
+  children,
+  ...props
+}: LinkProps & { href: string }): React.JSX.Element {
   return (
-    <a
+    <Link
       href={href}
       target="_blank"
       rel="noopener noreferrer"
       onClick={(e) => e.stopPropagation()}
-      className={`inline-flex items-center gap-1 rounded px-1.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground [&_svg]:size-3.5 ${className}`}
+      display="inline-flex"
+      alignItems="center"
+      gap="1"
+      rounded="sm"
+      px="1.5"
+      py="1"
+      fontSize="xs"
+      fontWeight="medium"
+      color="fg.muted"
+      textDecoration="none"
+      _hover={{ bg: 'bg.muted', color: 'fg', textDecoration: 'none' }}
+      css={{ '& svg': { width: '3.5', height: '3.5' } }}
+      {...props}
     >
       {children}
-    </a>
+    </Link>
   )
 }
 
@@ -34,10 +43,10 @@ export function SongLinks({
 }): React.JSX.Element | null {
   if (!youtubeUrl && !chordUrl) return null
   return (
-    <span className="inline-flex items-center gap-0.5">
+    <HStack as="span" display="inline-flex" gap="0.5">
       {youtubeUrl && (
         <ExternalA href={youtubeUrl}>
-          <CirclePlay className="text-danger" /> YouTube
+          <CirclePlay color="var(--chakra-colors-fg-error)" /> YouTube
         </ExternalA>
       )}
       {chordUrl && (
@@ -45,13 +54,13 @@ export function SongLinks({
           <FileMusic /> คอร์ด
         </ExternalA>
       )}
-    </span>
+    </HStack>
   )
 }
 
 export function TabLink({ href }: { href: string }): React.JSX.Element {
   return (
-    <ExternalA href={href} className="px-0">
+    <ExternalA href={href} px="0">
       <ExternalLink /> เปิด Tab
     </ExternalA>
   )

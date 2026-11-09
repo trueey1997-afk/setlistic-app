@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Button, chakra, HStack, Input, NativeSelect, Text } from '@chakra-ui/react'
 import {
   MUSICAL_KEYS,
   SONG_STATUSES,
@@ -10,7 +11,7 @@ import {
 } from '@shared/types'
 import { formatClock, parseClock } from '@shared/format'
 import { KeyChords } from './KeyChords'
-import { Button, Dialog, Field, Input, Select } from './ui'
+import { Dialog, Field } from './ui'
 
 export function SongFormDialog({
   bandId,
@@ -102,22 +103,34 @@ function SongForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="grid grid-cols-4 gap-4">
-      <Field label="ชื่อเพลง *" className="col-span-2">
+    <chakra.form
+      onSubmit={onSubmit}
+      display="grid"
+      gridTemplateColumns="repeat(4, minmax(0, 1fr))"
+      gap="4"
+    >
+      <Field label="ชื่อเพลง *" gridColumn="span 2">
         <Input name="title" required maxLength={200} defaultValue={song?.title} autoFocus />
       </Field>
-      <Field label="ศิลปิน" className="col-span-2">
+      <Field label="ศิลปิน" gridColumn="span 2">
         <Input name="artist" maxLength={200} defaultValue={song?.artist} />
       </Field>
       <Field label="คีย์">
-        <Select name="key" value={key} onChange={(e) => setKey(e.target.value as MusicalKey | '')}>
-          <option value="">–</option>
-          {MUSICAL_KEYS.map((k) => (
-            <option key={k} value={k}>
-              {k}
-            </option>
-          ))}
-        </Select>
+        <NativeSelect.Root>
+          <NativeSelect.Field
+            name="key"
+            value={key}
+            onChange={(e) => setKey(e.target.value as MusicalKey | '')}
+          >
+            <option value="">–</option>
+            {MUSICAL_KEYS.map((k) => (
+              <option key={k} value={k}>
+                {k}
+              </option>
+            ))}
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
       </Field>
       <Field label="BPM">
         <Input name="bpm" type="number" min={20} max={400} defaultValue={song?.bpm ?? ''} />
@@ -130,16 +143,19 @@ function SongForm({
         />
       </Field>
       <Field label="สถานะ">
-        <Select name="status" defaultValue={song?.status ?? 'learning'}>
-          {SONG_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {SONG_STATUS_LABEL[s]}
-            </option>
-          ))}
-        </Select>
+        <NativeSelect.Root>
+          <NativeSelect.Field name="status" defaultValue={song?.status ?? 'learning'}>
+            {SONG_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {SONG_STATUS_LABEL[s]}
+              </option>
+            ))}
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
       </Field>
-      <KeyChords musicalKey={key || null} className="col-span-4" />
-      <Field label="ลิงก์ YouTube" className="col-span-2">
+      <KeyChords musicalKey={key || null} gridColumn="span 4" />
+      <Field label="ลิงก์ YouTube" gridColumn="span 2">
         <Input
           name="youtubeUrl"
           type="url"
@@ -147,13 +163,13 @@ function SongForm({
           defaultValue={song?.youtubeUrl}
         />
       </Field>
-      <Field label="ลิงก์คอร์ด / Sheet" className="col-span-2">
+      <Field label="ลิงก์คอร์ด / Sheet" gridColumn="span 2">
         <Input name="chordUrl" type="url" placeholder="https://..." defaultValue={song?.chordUrl} />
       </Field>
-      <Field label="แท็ก (คั่นด้วย ,)" className="col-span-4">
+      <Field label="แท็ก (คั่นด้วย ,)" gridColumn="span 4">
         <Input name="tags" placeholder="เพลงช้า, เปิดงาน" defaultValue={song?.tags.join(', ')} />
       </Field>
-      <Field label="โน้ตย่อ" className="col-span-4">
+      <Field label="โน้ตย่อ" gridColumn="span 4">
         <Input
           name="notes"
           maxLength={5_000}
@@ -163,16 +179,26 @@ function SongForm({
       </Field>
 
       {error && (
-        <p className="col-span-4 rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>
+        <Text
+          gridColumn="span 4"
+          rounded="md"
+          bg="red.subtle"
+          color="fg.error"
+          px="3"
+          py="2"
+          fontSize="sm"
+        >
+          {error}
+        </Text>
       )}
-      <div className="col-span-4 flex justify-end gap-2">
+      <HStack gridColumn="span 4" justify="flex-end" gap="2">
         <Button type="button" variant="ghost" onClick={onCancel}>
           ยกเลิก
         </Button>
-        <Button type="submit" loading={saving}>
+        <Button type="submit" colorPalette="brand" loading={saving}>
           บันทึก
         </Button>
-      </div>
-    </form>
+      </HStack>
+    </chakra.form>
   )
 }

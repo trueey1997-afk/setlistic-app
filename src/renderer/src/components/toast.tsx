@@ -1,50 +1,43 @@
-import { createContext, useCallback, useContext, useRef, useState } from 'react'
+import { useCallback } from 'react'
+import { Portal, Toast, Toaster, createToaster } from '@chakra-ui/react'
 
-const ToastContext = createContext<(message: string) => void>(() => {})
+/** App-wide Chakra toaster: https://chakra-ui.com/docs/components/toast */
+// eslint-disable-next-line react-refresh/only-export-components
+export const toaster = createToaster({ placement: 'bottom', duration: 2500, max: 3 })
 
 export function ToastProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
-  const [message, setMessage] = useState<string | null>(null)
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
-
-  const toast = useCallback((msg: string) => {
-    setMessage(msg)
-    clearTimeout(timer.current)
-    timer.current = setTimeout(() => setMessage(null), 2500)
-  }, [])
-
   return (
-    <ToastContext.Provider value={toast}>
+    <>
       {children}
-      <div
-        aria-live="polite"
-        className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center"
-      >
-        {message && (
-          <div className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background shadow-lg">
-            {message}
-          </div>
-        )}
-      </div>
-    </ToastContext.Provider>
+      <Portal>
+        <Toaster toaster={toaster}>
+          {(t) => (
+            <Toast.Root width="auto" minW="auto" px="4" py="2">
+              <Toast.Title fontSize="sm">{t.title}</Toast.Title>
+            </Toast.Root>
+          )}
+        </Toaster>
+      </Portal>
+    </>
   )
 }
 
+const show = (message: string): void => {
+  toaster.create({ title: message })
+}
+
 // eslint-disable-next-line react-refresh/only-export-components
-export const useToast = (): ((message: string) => void) => useContext(ToastContext)
+export const useToast = (): ((message: string) => void) => show
 
 /** Runs an API call and shows its error as a toast instead of throwing. */
 // eslint-disable-next-line react-refresh/only-export-components
 export function useRun(): <T>(task: Promise<T>) => Promise<T | undefined> {
-  const toast = useToast()
-  return useCallback(
-    async <T,>(task: Promise<T>): Promise<T | undefined> => {
-      try {
-        return await task
-      } catch (err) {
-        toast((err as Error).message)
-        return undefined
-      }
-    },
-    [toast]
-  )
+  return useCallback(async <T,>(task: Promise<T>): Promise<T | undefined> => {
+    try {
+      return await task
+    } catch (err) {
+      toaster.create({ title: (err as Error).message, type: 'error' })
+      return undefined
+    }
+  }, [])
 }

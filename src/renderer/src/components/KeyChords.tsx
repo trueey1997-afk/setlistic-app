@@ -1,3 +1,4 @@
+import { Box, Grid, Span, Stack, Text, type StackProps } from '@chakra-ui/react'
 import type { MusicalKey } from '@shared/types'
 import { chordsInKey } from '@shared/music'
 
@@ -5,71 +6,82 @@ import { chordsInKey } from '@shared/music'
 export function KeyChords({
   musicalKey,
   compact,
-  className = ''
-}: {
+  ...props
+}: StackProps & {
   musicalKey: MusicalKey | null
   /** Smaller chips and a one-line hint, for the narrow column beside the chords. */
   compact?: boolean
-  className?: string
 }): React.JSX.Element | null {
   if (!musicalKey) return null
   const { chords, spelledAs, dominant } = chordsInKey(musicalKey)
   const strong = (text: string): React.JSX.Element => (
-    <span className="font-mono font-bold text-foreground">{text}</span>
+    <Span fontFamily="mono" fontWeight="bold" color="fg">
+      {text}
+    </Span>
   )
 
   return (
-    <div
-      className={`flex flex-col rounded-lg border border-border bg-muted/40 ${
-        compact ? 'gap-1.5 p-2' : 'gap-2 p-3'
-      } ${className}`}
+    <Stack
+      rounded="lg"
+      borderWidth="1px"
+      bg="bg.subtle"
+      gap={compact ? '1.5' : '2'}
+      p={compact ? '2' : '3'}
+      {...props}
     >
-      <p className="text-xs text-muted-foreground">
+      <Text fontSize="xs" color="fg.muted">
         คอร์ดในคีย์ {strong(musicalKey)}
         {spelledAs && ` (เขียนแบบ ${spelledAs} จะอ่านง่ายกว่า)`}
-        <span className="ml-2 inline-flex items-center gap-1">
-          · <span className="inline-block size-2.5 rounded-sm bg-primary" /> คอร์ดหลัก
-        </span>
-      </p>
-      <ul className={`grid grid-cols-7 ${compact ? 'gap-1' : 'gap-1.5'}`}>
+        <Span ml="2" display="inline-flex" alignItems="center" gap="1">
+          · <Span display="inline-block" boxSize="2.5" rounded="sm" bg="brand.solid" /> คอร์ดหลัก
+        </Span>
+      </Text>
+      <Grid as="ul" templateColumns="repeat(7, minmax(0, 1fr))" gap={compact ? '1' : '1.5'}>
         {chords.map((c) => (
-          <li
+          <Stack
+            as="li"
             key={c.degree}
             title={c.primary ? 'คอร์ดหลัก' : undefined}
-            className={`flex min-w-0 flex-col items-center rounded-md border px-0.5 ${
-              compact ? 'py-1' : 'py-1.5'
-            } ${
-              c.primary
-                ? 'border-primary bg-primary text-primary-foreground'
-                : 'border-border bg-background'
-            }`}
+            minW="0"
+            align="center"
+            gap="0"
+            rounded="md"
+            borderWidth="1px"
+            px="0.5"
+            py={compact ? '1' : '1.5'}
+            {...(c.primary
+              ? { borderColor: 'brand.solid', bg: 'brand.solid', color: 'brand.contrast' }
+              : { bg: 'bg' })}
           >
-            <span
-              className={`${compact ? 'text-[9px]' : 'text-[10px]'} ${
-                c.primary ? 'opacity-80' : 'text-muted-foreground'
-              }`}
+            <Box
+              fontSize={compact ? '9px' : '10px'}
+              {...(c.primary ? { opacity: 0.8 } : { color: 'fg.muted' })}
             >
               {c.degree}
-            </span>
-            <span
-              className={`max-w-full truncate font-mono font-bold ${compact ? 'text-xs' : 'text-sm'}`}
+            </Box>
+            <Box
+              maxW="full"
+              truncate
+              fontFamily="mono"
+              fontWeight="bold"
+              fontSize={compact ? 'xs' : 'sm'}
             >
               {c.name}
-            </span>
-          </li>
+            </Box>
+          </Stack>
         ))}
-      </ul>
+      </Grid>
       {dominant &&
         (compact ? (
-          <p className="text-xs text-muted-foreground">
+          <Text fontSize="xs" color="fg.muted">
             นิยมใช้ {strong(dominant)} / {strong(`${dominant}7`)} แทน v
-          </p>
+          </Text>
         ) : (
-          <p className="text-xs text-muted-foreground">
+          <Text fontSize="xs" color="fg.muted">
             คีย์ไมเนอร์นิยมใช้ {strong(dominant)} หรือ {strong(`${dominant}7`)} (V) แทนคอร์ด v
             ไมเนอร์ เพื่อให้ส่งกลับเข้าคอร์ด i ได้หนักแน่นขึ้น
-          </p>
+          </Text>
         ))}
-    </div>
+    </Stack>
   )
 }

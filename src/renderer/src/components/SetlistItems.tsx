@@ -1,5 +1,21 @@
 import { useState } from 'react'
 import {
+  Box,
+  Button,
+  Checkbox,
+  chakra,
+  Flex,
+  Grid,
+  HStack,
+  IconButton,
+  Input,
+  NativeSelect,
+  Text,
+  Wrap,
+  type ButtonProps,
+  type GridProps
+} from '@chakra-ui/react'
+import {
   DndContext,
   KeyboardSensor,
   PointerSensor,
@@ -29,7 +45,7 @@ import {
 import { formatClock } from '@shared/format'
 import { isItemReady } from '@shared/lineSummary'
 import { KeyChords } from './KeyChords'
-import { Badge, Button, Dialog, Field, Input, Select } from './ui'
+import { Badge, Dialog, Field } from './ui'
 
 const NEXT_STATUS: Record<PracticeStatus, PracticeStatus> = {
   not_started: 'practicing',
@@ -37,15 +53,19 @@ const NEXT_STATUS: Record<PracticeStatus, PracticeStatus> = {
   ready: 'not_started'
 }
 const STATUS_ICON = { not_started: Circle, practicing: Clock, ready: Check }
-const STATUS_CHIP: Record<PracticeStatus, string> = {
-  not_started: 'border-border text-muted-foreground',
-  practicing: 'border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400',
-  ready: 'border-emerald-500/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+const STATUS_CHIP: Record<PracticeStatus, ButtonProps> = {
+  not_started: { variant: 'outline', colorPalette: 'gray', color: 'fg.muted' },
+  practicing: { variant: 'surface', colorPalette: 'orange' },
+  ready: { variant: 'surface', colorPalette: 'green' }
 }
 
 /** Grip · # · song · key · BPM · time · actions; shared by the header and every row. */
-const COLUMNS =
-  'grid grid-cols-[2rem_2.75rem_minmax(0,1fr)_4rem_3.5rem_3.5rem_4.5rem] items-center gap-2'
+const COLUMNS: GridProps = {
+  display: 'grid',
+  gridTemplateColumns: '2rem 2.75rem minmax(0,1fr) 4rem 3.5rem 3.5rem 4.5rem',
+  alignItems: 'center',
+  gap: '2'
+}
 
 export function SetlistItems({
   items,
@@ -91,22 +111,30 @@ export function SetlistItems({
 
   return (
     <>
-      <div className="overflow-hidden rounded-xl border border-border bg-card">
-        <div
+      <Box overflow="hidden" rounded="xl" borderWidth="1px" bg="bg.panel">
+        <Grid
           aria-hidden
-          className={`${COLUMNS} border-b border-border px-2 py-2 text-[10px] font-bold tracking-widest text-muted-foreground uppercase`}
+          {...COLUMNS}
+          borderBottomWidth="1px"
+          px="2"
+          py="2"
+          fontSize="10px"
+          fontWeight="bold"
+          letterSpacing="widest"
+          color="fg.muted"
+          textTransform="uppercase"
         >
           <span />
-          <span className="text-center">#</span>
-          <span>เพลง</span>
-          <span className="text-center">Key</span>
-          <span className="text-right">BPM</span>
-          <span className="text-right">Time</span>
+          <Text textAlign="center">#</Text>
+          <Text>เพลง</Text>
+          <Text textAlign="center">Key</Text>
+          <Text textAlign="right">BPM</Text>
+          <Text textAlign="right">Time</Text>
           <span />
-        </div>
+        </Grid>
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
           <SortableContext items={items.map((it) => it.id)} strategy={verticalListSortingStrategy}>
-            <ol className="divide-y divide-border">
+            <Box as="ol" divideY="1px">
               {items.map((item) => (
                 <Row
                   key={item.id}
@@ -121,10 +149,10 @@ export function SetlistItems({
                   onPlayed={(played) => onPlayed(item, played)}
                 />
               ))}
-            </ol>
+            </Box>
           </SortableContext>
         </DndContext>
-      </div>
+      </Box>
 
       <ItemDialog item={editing} onClose={() => setEditing(null)} onSubmit={onEdit} />
     </>
@@ -175,8 +203,10 @@ function ItemForm({
   const [keyOverride, setKeyOverride] = useState<MusicalKey | ''>(item.keyOverride ?? '')
 
   return (
-    <form
-      className="flex flex-col gap-4"
+    <chakra.form
+      display="flex"
+      flexDirection="column"
+      gap="4"
       onSubmit={(e) => {
         e.preventDefault()
         const f = new FormData(e.currentTarget)
@@ -184,17 +214,20 @@ function ItemForm({
       }}
     >
       <Field label={`คีย์สำหรับงานนี้ (ต้นฉบับ: ${item.song.key ?? '–'})`}>
-        <Select
-          value={keyOverride}
-          onChange={(e) => setKeyOverride(e.target.value as MusicalKey | '')}
-        >
-          <option value="">ใช้คีย์ต้นฉบับ</option>
-          {MUSICAL_KEYS.map((k) => (
-            <option key={k} value={k}>
-              {k}
-            </option>
-          ))}
-        </Select>
+        <NativeSelect.Root>
+          <NativeSelect.Field
+            value={keyOverride}
+            onChange={(e) => setKeyOverride(e.target.value as MusicalKey | '')}
+          >
+            <option value="">ใช้คีย์ต้นฉบับ</option>
+            {MUSICAL_KEYS.map((k) => (
+              <option key={k} value={k}>
+                {k}
+              </option>
+            ))}
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
       </Field>
       <KeyChords musicalKey={keyOverride || item.song.key} />
       <Field label="โน้ตสำหรับงานนี้">
@@ -205,13 +238,15 @@ function ItemForm({
           placeholder="เช่น ต่อเพลงถัดไปเลย ไม่หยุด"
         />
       </Field>
-      <div className="flex justify-end gap-2">
+      <HStack justify="flex-end" gap="2">
         <Button type="button" variant="ghost" onClick={onCancel}>
           ยกเลิก
         </Button>
-        <Button type="submit">บันทึก</Button>
-      </div>
-    </form>
+        <Button type="submit" colorPalette="brand">
+          บันทึก
+        </Button>
+      </HStack>
+    </chakra.form>
   )
 }
 
@@ -250,117 +285,173 @@ function Row({
   const changedKey = !!item.keyOverride && item.keyOverride !== song.key
 
   return (
-    <li
+    <Box
+      as="li"
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       onClick={onSelect}
-      className={`group relative cursor-pointer border-l-2 ${
-        isDragging
-          ? 'z-10 border-primary bg-muted shadow-xl'
-          : selected
-            ? 'border-primary bg-muted'
-            : 'border-transparent hover:bg-muted/50'
-      }`}
+      className="group"
+      position="relative"
+      cursor="pointer"
+      borderLeftWidth="2px"
+      borderColor={isDragging || selected ? 'brand.solid' : 'transparent'}
+      bg={isDragging || selected ? 'bg.muted' : undefined}
+      _hover={{ bg: 'bg.muted' }}
+      {...(isDragging && { zIndex: 1, shadow: 'xl' })}
     >
-      <div className={`${COLUMNS} px-2 py-2`}>
+      <Grid {...COLUMNS} px="2" py="2">
         {/* Arrow keys move the row once the grip has focus (dnd-kit keyboard sensor) */}
-        <button
+        <IconButton
           ref={setActivatorNodeRef}
           {...attributes}
           {...listeners}
+          variant="ghost"
+          size="2xs"
+          color="fg.muted"
           disabled={!reorderable}
           onClick={(e) => e.stopPropagation()}
-          className="cursor-grab touch-none rounded p-1 text-muted-foreground hover:text-foreground active:cursor-grabbing disabled:cursor-default disabled:opacity-25"
+          cursor="grab"
+          touchAction="none"
+          _active={{ cursor: 'grabbing' }}
+          _disabled={{ cursor: 'default', opacity: 0.25 }}
           aria-label={`ลากเพื่อย้าย ${song.title}`}
           title={reorderable ? 'ลากเพื่อจัดลำดับ' : 'ล้างช่องค้นหาก่อนจึงจัดลำดับได้'}
         >
-          <GripVertical className="size-4" />
-        </button>
+          <GripVertical />
+        </IconButton>
 
-        <label
-          className="flex cursor-pointer items-center justify-center gap-1.5"
+        <HStack
+          justify="center"
+          gap="1.5"
           onClick={(e) => e.stopPropagation()}
           title="ติ๊กเมื่อเล่นเพลงนี้แล้ว"
         >
-          <input
-            type="checkbox"
+          <Checkbox.Root
+            size="xs"
+            colorPalette="brand"
             checked={item.played}
-            onChange={(e) => onPlayed(e.target.checked)}
-            className="size-3.5 cursor-pointer accent-primary"
+            onCheckedChange={(e) => onPlayed(e.checked === true)}
             aria-label={`เล่นแล้ว: ${song.title}`}
-          />
-          <span
-            className={`font-mono text-sm font-bold tabular-nums ${
-              item.played ? 'text-muted-foreground' : ''
-            }`}
           >
-            {String(number).padStart(2, '0')}
-          </span>
-        </label>
+            <Checkbox.HiddenInput />
+            <Checkbox.Control />
+            <Checkbox.Label
+              fontFamily="mono"
+              fontSize="sm"
+              fontWeight="bold"
+              fontVariantNumeric="tabular-nums"
+              color={item.played ? 'fg.muted' : undefined}
+            >
+              {String(number).padStart(2, '0')}
+            </Checkbox.Label>
+          </Checkbox.Root>
+        </HStack>
 
-        <div className={`min-w-0 ${item.played ? 'opacity-50' : ''}`}>
-          <p className={`truncate text-sm font-semibold ${item.played ? 'line-through' : ''}`}>
+        <Box minW="0" opacity={item.played ? 0.5 : undefined}>
+          <Text
+            truncate
+            fontSize="sm"
+            fontWeight="semibold"
+            textDecoration={item.played ? 'line-through' : undefined}
+          >
             {isItemReady(item) && (
-              <Check className="mr-1 inline size-3.5 text-emerald-500" aria-label="ทั้งวงพร้อม" />
+              <Check
+                size={14}
+                color="var(--chakra-colors-green-500)"
+                style={{ display: 'inline', marginRight: 4 }}
+                aria-label="ทั้งวงพร้อม"
+              />
             )}
             {song.title}
-          </p>
-          <p className="truncate text-xs text-muted-foreground">
+          </Text>
+          <Text truncate fontSize="xs" color="fg.muted">
             {song.artist || '—'}
-            {item.note && <span className="text-foreground"> · {item.note}</span>}
-          </p>
-        </div>
+            {item.note && (
+              <Text as="span" color="fg">
+                {' '}
+                · {item.note}
+              </Text>
+            )}
+          </Text>
+        </Box>
 
-        <div className="flex justify-center">
+        <Flex justify="center">
           {key ? (
             <Badge
               tone={changedKey ? 'warning' : 'key'}
-              className="min-w-10 justify-center font-mono text-sm"
+              minW="10"
+              justifyContent="center"
+              fontFamily="mono"
+              fontSize="sm"
             >
               {key}
             </Badge>
           ) : (
-            <span className="font-mono text-muted-foreground">–</span>
+            <Text fontFamily="mono" color="fg.muted">
+              –
+            </Text>
           )}
-        </div>
-        <span className="text-right font-mono text-sm font-bold tabular-nums">
-          {song.bpm ?? <span className="text-muted-foreground">–</span>}
-        </span>
-        <span className="text-right font-mono text-sm text-muted-foreground tabular-nums">
+        </Flex>
+        <Text
+          textAlign="right"
+          fontFamily="mono"
+          fontSize="sm"
+          fontWeight="bold"
+          fontVariantNumeric="tabular-nums"
+        >
+          {song.bpm ?? (
+            <Text as="span" color="fg.muted">
+              –
+            </Text>
+          )}
+        </Text>
+        <Text
+          textAlign="right"
+          fontFamily="mono"
+          fontSize="sm"
+          color="fg.muted"
+          fontVariantNumeric="tabular-nums"
+        >
           {formatClock(song.durationSec)}
-        </span>
+        </Text>
 
-        <div
-          className={`flex justify-end focus-within:opacity-100 group-hover:opacity-100 ${
-            selected ? '' : 'opacity-0'
-          }`}
+        <Flex
+          justify="flex-end"
+          opacity={selected ? 1 : 0}
+          _focusWithin={{ opacity: 1 }}
+          _groupHover={{ opacity: 1 }}
           onClick={(e) => e.stopPropagation()}
         >
-          <button
+          <IconButton
+            variant="ghost"
+            size="xs"
+            color="fg.muted"
             onClick={onEdit}
             aria-label="ตั้งค่าคีย์และโน้ต"
             title="ตั้งค่าคีย์และโน้ต"
-            className="rounded-md p-1.5 text-muted-foreground hover:bg-background hover:text-foreground"
           >
-            <Pencil className="size-4" />
-          </button>
-          <button
+            <Pencil />
+          </IconButton>
+          <IconButton
+            variant="ghost"
+            size="xs"
+            color="fg.muted"
+            _hover={{ bg: 'red.subtle', color: 'fg.error' }}
             onClick={onRemove}
             aria-label="เอาออกจากเซ็ตลิสต์"
             title="เอาออกจากเซ็ตลิสต์"
-            className="rounded-md p-1.5 text-muted-foreground hover:bg-danger/10 hover:text-danger"
           >
-            <X className="size-4" />
-          </button>
-        </div>
-      </div>
+            <X />
+          </IconButton>
+        </Flex>
+      </Grid>
 
       {item.progress.length > 0 && (
-        <div className="pr-2 pb-2 pl-[6.25rem]" onClick={(e) => e.stopPropagation()}>
+        <Box pr="2" pb="2" pl="6.25rem" onClick={(e) => e.stopPropagation()}>
           <ProgressChips progress={item.progress} onChange={onProgress} />
-        </div>
+        </Box>
       )}
-    </li>
+    </Box>
   )
 }
 
@@ -373,22 +464,25 @@ function ProgressChips({
   onChange: (memberId: number, status: PracticeStatus) => void
 }): React.JSX.Element {
   return (
-    <ul className="flex flex-wrap gap-1">
+    <Wrap as="ul" gap="1">
       {progress.map((p) => {
         const Icon = STATUS_ICON[p.status]
         return (
           <li key={p.member.id}>
-            <button
+            <Button
+              size="2xs"
+              px="2"
+              fontWeight="semibold"
+              {...STATUS_CHIP[p.status]}
               onClick={() => onChange(p.member.id, NEXT_STATUS[p.status])}
               title={`${p.member.name}: ${PRACTICE_STATUS_LABEL[p.status]} (คลิกเพื่อเปลี่ยน)`}
-              className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold ${STATUS_CHIP[p.status]}`}
             >
-              <Icon className="size-3" />
+              <Icon />
               {p.member.name}
-            </button>
+            </Button>
           </li>
         )
       })}
-    </ul>
+    </Wrap>
   )
 }

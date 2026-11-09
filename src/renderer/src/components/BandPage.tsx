@@ -1,4 +1,17 @@
 import { useState } from 'react'
+import {
+  Box,
+  Button,
+  chakra,
+  Flex,
+  Heading,
+  HStack,
+  IconButton,
+  Input,
+  Stack,
+  Text,
+  Wrap
+} from '@chakra-ui/react'
 import { Pencil, Trash2, UserPlus, Users } from 'lucide-react'
 import {
   INSTRUMENTS,
@@ -10,7 +23,7 @@ import {
 } from '@shared/types'
 import { useAsync } from '@renderer/hooks/useAsync'
 import { useRun } from './toast'
-import { Badge, Button, Input } from './ui'
+import { Badge, SectionLabel } from './ui'
 
 /** Create-a-band screen: shown on first launch, or from "+ สร้างวงใหม่". */
 export function BandOnboarding({
@@ -26,21 +39,25 @@ export function BandOnboarding({
   const [name, setName] = useState('')
 
   return (
-    <div className="flex flex-1 items-center justify-center p-8">
-      <form
-        className="flex w-full max-w-sm flex-col gap-4"
+    <Flex flex="1" align="center" justify="center" p="8">
+      <chakra.form
+        display="flex"
+        flexDirection="column"
+        w="full"
+        maxW="sm"
+        gap="4"
         onSubmit={async (e) => {
           e.preventDefault()
           const band = await run(window.setlistic.bands.create(name))
           if (band) onCreated(band)
         }}
       >
-        <div>
-          <h1 className="text-2xl font-bold">{first ? 'เริ่มจากสร้างวง' : 'สร้างวงใหม่'}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+        <Box>
+          <Heading size="2xl">{first ? 'เริ่มจากสร้างวง' : 'สร้างวงใหม่'}</Heading>
+          <Text mt="1" fontSize="sm" color="fg.muted">
             แต่ละวงมีคลังเพลง เซ็ตลิสต์ และสมาชิกของตัวเอง ข้อมูลเก็บในเครื่องนี้เท่านั้น
-          </p>
-        </div>
+          </Text>
+        </Box>
         <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -49,18 +66,18 @@ export function BandOnboarding({
           required
           autoFocus
         />
-        <div className="flex gap-2">
+        <HStack gap="2">
           {onCancel && (
             <Button type="button" variant="ghost" onClick={onCancel}>
               ยกเลิก
             </Button>
           )}
-          <Button type="submit" className="flex-1">
+          <Button type="submit" colorPalette="brand" flex="1">
             สร้างวง
           </Button>
-        </div>
-      </form>
-    </div>
+        </HStack>
+      </chakra.form>
+    </Flex>
   )
 }
 
@@ -78,7 +95,12 @@ export function BandPage({
   const band = useAsync(() => window.setlistic.bands.get(bandId), `band:${bandId}`)
   const [editingMember, setEditingMember] = useState<Member | 'new' | null>(null)
 
-  if (!band.data) return <p className="p-6 text-danger">{band.error}</p>
+  if (!band.data)
+    return (
+      <Text p="6" color="fg.error">
+        {band.error}
+      </Text>
+    )
   const b = band.data
 
   async function save(task: Promise<Band>): Promise<boolean> {
@@ -90,15 +112,14 @@ export function BandPage({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="mx-auto flex max-w-2xl flex-col gap-8 p-8">
-        <section className="flex flex-col gap-3">
-          <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">
-            ชื่อวง
-          </h2>
-          <form
+    <Box flex="1" overflowY="auto">
+      <Stack mx="auto" maxW="2xl" gap="8" p="8">
+        <Stack as="section" gap="3">
+          <SectionLabel>ชื่อวง</SectionLabel>
+          <chakra.form
             key={b.name}
-            className="flex gap-2"
+            display="flex"
+            gap="2"
             onSubmit={(e) => {
               e.preventDefault()
               const name = String(new FormData(e.currentTarget).get('name') ?? '')
@@ -110,23 +131,22 @@ export function BandPage({
               defaultValue={b.name}
               maxLength={120}
               required
-              className="text-base font-semibold"
+              fontSize="md"
+              fontWeight="semibold"
             />
             <Button type="submit" variant="outline">
               บันทึก
             </Button>
-          </form>
-        </section>
+          </chakra.form>
+        </Stack>
 
-        <section className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">
-              สมาชิก ({b.members.length})
-            </h2>
+        <Stack as="section" gap="3">
+          <Flex align="center" justify="space-between">
+            <SectionLabel>สมาชิก ({b.members.length})</SectionLabel>
             <Button variant="outline" onClick={() => setEditingMember('new')}>
               <UserPlus /> เพิ่มสมาชิก
             </Button>
-          </div>
+          </Flex>
 
           {editingMember === 'new' && (
             <MemberForm
@@ -139,15 +159,32 @@ export function BandPage({
           )}
 
           {b.members.length === 0 && editingMember !== 'new' ? (
-            <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-              <Users className="size-6" />
+            <Stack
+              align="center"
+              gap="2"
+              rounded="lg"
+              borderWidth="1px"
+              borderStyle="dashed"
+              p="8"
+              textAlign="center"
+              fontSize="sm"
+              color="fg.muted"
+            >
+              <Users size={24} />
               เพิ่มชื่อสมาชิกเพื่อใช้กับโน้ตรายเครื่องดนตรีและสถานะการซ้อม
-            </div>
+            </Stack>
           ) : (
-            <ul className="divide-y divide-border rounded-lg border border-border">
+            <Stack
+              as="ul"
+              listStyleType="none"
+              gap="0"
+              rounded="lg"
+              borderWidth="1px"
+              divideY="1px"
+            >
               {b.members.map((m) =>
                 editingMember !== 'new' && editingMember?.id === m.id ? (
-                  <li key={m.id} className="p-3">
+                  <Box as="li" key={m.id} p="3">
                     <MemberForm
                       member={m}
                       onCancel={() => setEditingMember(null)}
@@ -156,24 +193,28 @@ export function BandPage({
                           setEditingMember(null)
                       }}
                     />
-                  </li>
+                  </Box>
                 ) : (
-                  <li key={m.id} className="flex items-center gap-3 px-4 py-3">
-                    <span className="flex-1 font-semibold">{m.name}</span>
-                    <span className="flex flex-wrap justify-end gap-1">
+                  <HStack as="li" key={m.id} gap="3" px="4" py="3">
+                    <Text flex="1" fontWeight="semibold">
+                      {m.name}
+                    </Text>
+                    <Wrap justify="flex-end" gap="1">
                       {m.instruments.map((i) => (
                         <Badge key={i}>{INSTRUMENT_LABEL[i]}</Badge>
                       ))}
-                    </span>
-                    <Button
+                    </Wrap>
+                    <IconButton
                       variant="ghost"
+                      color="fg.muted"
                       onClick={() => setEditingMember(m)}
                       aria-label={`แก้ไข ${m.name}`}
                     >
                       <Pencil />
-                    </Button>
-                    <Button
-                      variant="danger"
+                    </IconButton>
+                    <IconButton
+                      variant="ghost"
+                      colorPalette="red"
                       aria-label={`ลบ ${m.name}`}
                       onClick={() => {
                         if (confirm(`ลบ ${m.name} ออกจากวง?\nสถานะการซ้อมของคนนี้จะถูกลบด้วย`))
@@ -181,18 +222,19 @@ export function BandPage({
                       }}
                     >
                       <Trash2 />
-                    </Button>
-                  </li>
+                    </IconButton>
+                  </HStack>
                 )
               )}
-            </ul>
+            </Stack>
           )}
-        </section>
+        </Stack>
 
-        <section className="flex flex-col gap-2 border-t border-border pt-6">
+        <Stack as="section" gap="2" borderTopWidth="1px" pt="6">
           <Button
-            variant="danger"
-            className="self-start"
+            variant="ghost"
+            colorPalette="red"
+            alignSelf="flex-start"
             onClick={async () => {
               if (!confirm(`ลบวง "${b.name}"?\nเพลง เซ็ตลิสต์ และสมาชิกทั้งหมดของวงนี้จะถูกลบถาวร`))
                 return
@@ -201,9 +243,9 @@ export function BandPage({
           >
             <Trash2 /> ลบวงนี้
           </Button>
-        </section>
-      </div>
-    </div>
+        </Stack>
+      </Stack>
+    </Box>
   )
 }
 
@@ -220,8 +262,13 @@ function MemberForm({
   const [instruments, setInstruments] = useState<Instrument[]>(member?.instruments ?? [])
 
   return (
-    <form
-      className="flex flex-col gap-3 rounded-lg border border-border p-3"
+    <chakra.form
+      display="flex"
+      flexDirection="column"
+      gap="3"
+      rounded="lg"
+      borderWidth="1px"
+      p="3"
       onSubmit={(e) => {
         e.preventDefault()
         onSave({ name, instruments })
@@ -234,34 +281,35 @@ function MemberForm({
         required
         autoFocus
       />
-      <div className="flex flex-wrap gap-1.5">
+      <Wrap gap="1.5">
         {INSTRUMENTS.map((inst) => {
           const on = instruments.includes(inst)
           return (
-            <button
+            <Button
               key={inst}
               type="button"
+              size="xs"
               aria-pressed={on}
+              variant={on ? 'solid' : 'outline'}
+              colorPalette={on ? 'brand' : 'gray'}
+              fontWeight="medium"
               onClick={() =>
                 setInstruments(on ? instruments.filter((i) => i !== inst) : [...instruments, inst])
               }
-              className={`rounded-md border px-2.5 py-1 text-sm font-medium ${
-                on
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-border hover:bg-muted'
-              }`}
             >
               {INSTRUMENT_LABEL[inst]}
-            </button>
+            </Button>
           )
         })}
-      </div>
-      <div className="flex justify-end gap-2">
+      </Wrap>
+      <HStack justify="flex-end" gap="2">
         <Button type="button" variant="ghost" onClick={onCancel}>
           ยกเลิก
         </Button>
-        <Button type="submit">บันทึก</Button>
-      </div>
-    </form>
+        <Button type="submit" colorPalette="brand">
+          บันทึก
+        </Button>
+      </HStack>
+    </chakra.form>
   )
 }

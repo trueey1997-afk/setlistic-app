@@ -1,4 +1,19 @@
 import { useState } from 'react'
+import {
+  Box,
+  Button,
+  chakra,
+  Collapsible,
+  Flex,
+  Heading,
+  HStack,
+  IconButton,
+  Input,
+  NativeSelect,
+  Stack,
+  Text,
+  Textarea
+} from '@chakra-ui/react'
 import { Pencil, Trash2 } from 'lucide-react'
 import {
   INSTRUMENTS,
@@ -11,7 +26,7 @@ import {
 } from '@shared/types'
 import { TabLink } from './links'
 import { useRun } from './toast'
-import { Button, Input, Select, Textarea } from './ui'
+import { SectionLabel } from './ui'
 
 /** Per-member, per-instrument notes and tab links for one song. */
 export function InstrumentNotes({
@@ -38,14 +53,14 @@ export function InstrumentNotes({
   })).filter((g) => g.notes.length > 0)
 
   return (
-    <section className="flex flex-col gap-4 border-t border-border pt-6">
-      <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">
-        โน้ตรายเครื่องดนตรี
-      </h2>
+    <Stack as="section" gap="4" borderTopWidth="1px" pt="6">
+      <SectionLabel>โน้ตรายเครื่องดนตรี</SectionLabel>
 
       {groups.map(({ inst, notes }) => (
-        <div key={inst} className="flex flex-col gap-2">
-          <h3 className="text-sm font-semibold">{INSTRUMENT_LABEL[inst]}</h3>
+        <Stack key={inst} gap="2">
+          <Heading as="h3" size="sm">
+            {INSTRUMENT_LABEL[inst]}
+          </Heading>
           {notes.map((note) =>
             editing === note.id ? (
               <NoteForm
@@ -59,42 +74,60 @@ export function InstrumentNotes({
                 }}
               />
             ) : (
-              <div key={note.id} className="flex items-start gap-3 rounded-md bg-muted px-3 py-2">
-                <div className="min-w-0 flex-1 text-sm">
-                  <p className="text-xs font-semibold text-muted-foreground">
+              <Flex
+                key={note.id}
+                align="flex-start"
+                gap="3"
+                rounded="md"
+                bg="bg.muted"
+                px="3"
+                py="2"
+              >
+                <Box minW="0" flex="1" fontSize="sm">
+                  <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
                     {note.member?.name ?? 'ไม่ระบุ'}
-                  </p>
-                  {note.note && <p className="whitespace-pre-wrap">{note.note}</p>}
+                  </Text>
+                  {note.note && <Text whiteSpace="pre-wrap">{note.note}</Text>}
                   {note.tabUrl && <TabLink href={note.tabUrl} />}
-                </div>
-                <Button variant="ghost" onClick={() => setEditing(note.id)} aria-label="แก้ไขโน้ต">
+                </Box>
+                <IconButton
+                  variant="ghost"
+                  color="fg.muted"
+                  onClick={() => setEditing(note.id)}
+                  aria-label="แก้ไขโน้ต"
+                >
                   <Pencil />
-                </Button>
-                <Button
-                  variant="danger"
+                </IconButton>
+                <IconButton
+                  variant="ghost"
+                  colorPalette="red"
                   aria-label="ลบโน้ต"
                   onClick={() => {
                     if (confirm('ลบโน้ตนี้?')) save(window.setlistic.songs.removeNote(note.id))
                   }}
                 >
                   <Trash2 />
-                </Button>
-              </div>
+                </IconButton>
+              </Flex>
             )
           )}
-        </div>
+        </Stack>
       ))}
 
-      <details className="rounded-md border border-dashed border-border p-3">
-        <summary className="cursor-pointer text-sm font-semibold">+ เพิ่มโน้ต</summary>
-        <div className="mt-3">
-          <NoteForm
-            members={members}
-            onSave={(input) => save(window.setlistic.songs.addNote(song.id, input))}
-          />
-        </div>
-      </details>
-    </section>
+      <Collapsible.Root rounded="md" borderWidth="1px" borderStyle="dashed" p="3">
+        <Collapsible.Trigger cursor="pointer" fontSize="sm" fontWeight="semibold">
+          + เพิ่มโน้ต
+        </Collapsible.Trigger>
+        <Collapsible.Content>
+          <Box mt="3">
+            <NoteForm
+              members={members}
+              onSave={(input) => save(window.setlistic.songs.addNote(song.id, input))}
+            />
+          </Box>
+        </Collapsible.Content>
+      </Collapsible.Root>
+    </Stack>
   )
 }
 
@@ -119,8 +152,10 @@ function NoteForm({
   )
 
   return (
-    <form
-      className="flex flex-col gap-2"
+    <chakra.form
+      display="flex"
+      flexDirection="column"
+      gap="2"
       onSubmit={async (e) => {
         e.preventDefault()
         const form = e.currentTarget
@@ -134,36 +169,42 @@ function NoteForm({
         if (!note) form.reset()
       }}
     >
-      <div className="flex gap-2">
-        <Select
-          value={memberId ?? ''}
-          onChange={(e) => {
-            const id = Number(e.target.value) || null
-            setMemberId(id)
-            const first = members.find((m) => m.id === id)?.instruments[0]
-            if (first) setInstrument(first)
-          }}
-          aria-label="สมาชิก"
-        >
-          <option value="">ไม่ระบุ</option>
-          {members.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </Select>
-        <Select
-          value={instrument}
-          onChange={(e) => setInstrument(e.target.value as Instrument)}
-          aria-label="เครื่องดนตรี"
-        >
-          {INSTRUMENTS.map((i) => (
-            <option key={i} value={i}>
-              {INSTRUMENT_LABEL[i]}
-            </option>
-          ))}
-        </Select>
-      </div>
+      <HStack gap="2">
+        <NativeSelect.Root>
+          <NativeSelect.Field
+            value={memberId ?? ''}
+            onChange={(e) => {
+              const id = Number(e.target.value) || null
+              setMemberId(id)
+              const first = members.find((m) => m.id === id)?.instruments[0]
+              if (first) setInstrument(first)
+            }}
+            aria-label="สมาชิก"
+          >
+            <option value="">ไม่ระบุ</option>
+            {members.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
+        <NativeSelect.Root>
+          <NativeSelect.Field
+            value={instrument}
+            onChange={(e) => setInstrument(e.target.value as Instrument)}
+            aria-label="เครื่องดนตรี"
+          >
+            {INSTRUMENTS.map((i) => (
+              <option key={i} value={i}>
+                {INSTRUMENT_LABEL[i]}
+              </option>
+            ))}
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
+      </HStack>
       <Textarea
         name="note"
         rows={2}
@@ -172,14 +213,16 @@ function NoteForm({
         placeholder="เช่น ท่อนฮุคเล่น octave / intro เว้น 2 ห้อง"
       />
       <Input name="tabUrl" type="url" defaultValue={note?.tabUrl} placeholder="ลิงก์ Tab (ถ้ามี)" />
-      <div className="flex justify-end gap-2">
+      <HStack justify="flex-end" gap="2">
         {onCancel && (
           <Button type="button" variant="ghost" onClick={onCancel}>
             ยกเลิก
           </Button>
         )}
-        <Button type="submit">{note ? 'บันทึก' : 'เพิ่มโน้ต'}</Button>
-      </div>
-    </form>
+        <Button type="submit" colorPalette="brand">
+          {note ? 'บันทึก' : 'เพิ่มโน้ต'}
+        </Button>
+      </HStack>
+    </chakra.form>
   )
 }

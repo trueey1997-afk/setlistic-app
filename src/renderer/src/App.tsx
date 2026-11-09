@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Flex, HStack, IconButton, NativeSelect, Tabs, Text } from '@chakra-ui/react'
 import { Moon, PanelLeftClose, PanelLeftOpen, Sun } from 'lucide-react'
 import type { BandSummary } from '@shared/types'
 import { useAsync } from './hooks/useAsync'
@@ -7,7 +8,6 @@ import { ToastProvider } from './components/toast'
 import { BandOnboarding, BandPage } from './components/BandPage'
 import { SongLibrary } from './components/SongLibrary'
 import { SetlistsPage } from './components/SetlistsPage'
-import logo from './assets/logo.png'
 
 type Tab = 'setlists' | 'songs' | 'band'
 const TABS: { id: Tab; label: string }[] = [
@@ -69,80 +69,90 @@ function App(): React.JSX.Element {
 
   return (
     <ToastProvider>
-      <div className="flex h-full flex-col">
-        <header className="flex h-12 shrink-0 items-center justify-between gap-4 border-b border-border px-4">
-          <div className="flex min-w-0 items-center gap-5">
-                  {hasSidebar && (
-              <button
+      <Flex direction="column" h="full">
+        <Flex
+          as="header"
+          h="12"
+          flexShrink={0}
+          align="center"
+          justify="space-between"
+          gap="4"
+          borderBottomWidth="1px"
+          px="4"
+        >
+          <HStack minW="0" gap="5">
+            {hasSidebar && (
+              <IconButton
+                variant="ghost"
+                size="sm"
+                color="fg.muted"
                 onClick={toggleSidebar}
-                className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
                 aria-label={sidebarOpen ? 'ซ่อนรายการ' : 'แสดงรายการ'}
                 aria-expanded={sidebarOpen}
                 title={sidebarOpen ? 'ซ่อนรายการ' : 'แสดงรายการ'}
               >
-                {sidebarOpen ? (
-                  <PanelLeftClose className="size-4" />
-                ) : (
-                  <PanelLeftOpen className="size-4" />
-                )}
-              </button>
+                {sidebarOpen ? <PanelLeftClose /> : <PanelLeftOpen />}
+              </IconButton>
             )}
-            <span className="flex items-center gap-2 text-sm font-bold tracking-[0.2em] uppercase">
-              {/* <img src={logo} alt="" className="size-8 rounded-md" /> */}
+            <Text fontSize="sm" fontWeight="bold" letterSpacing="0.2em" textTransform="uppercase">
               Setlistic
-            </span>
+            </Text>
             {band && (
               <>
-                <select
-                  value={band.id}
-                  onChange={(e) =>
-                    e.target.value === 'new'
-                      ? setCreatingBand(true)
-                      : selectBand(Number(e.target.value))
-                  }
-                  className="h-8 max-w-48 truncate rounded-md border border-border bg-background px-2 text-sm font-semibold"
-                  aria-label="เลือกวง"
+                <NativeSelect.Root size="xs" maxW="48" aria-label="เลือกวง">
+                  <NativeSelect.Field
+                    value={band.id}
+                    fontWeight="semibold"
+                    onChange={(e) =>
+                      e.target.value === 'new'
+                        ? setCreatingBand(true)
+                        : selectBand(Number(e.target.value))
+                    }
+                  >
+                    {bands.data?.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                    <option value="new">+ สร้างวงใหม่…</option>
+                  </NativeSelect.Field>
+                  <NativeSelect.Indicator />
+                </NativeSelect.Root>
+                <Tabs.Root
+                  value={tab}
+                  onValueChange={(e) => setTab(e.value as Tab)}
+                  variant="line"
+                  colorPalette="brand"
+                  size="sm"
+                  h="12"
                 >
-                  {bands.data?.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                  <option value="new">+ สร้างวงใหม่…</option>
-                </select>
-                <nav className="flex h-12 items-stretch text-sm font-semibold">
-                  {TABS.map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => setTab(t.id)}
-                      aria-current={tab === t.id ? 'page' : undefined}
-                      className={`border-b-2 px-3 ${
-                        tab === t.id
-                          ? 'border-primary text-foreground'
-                          : 'border-transparent text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
-                </nav>
+                  <Tabs.List h="full" borderBottomWidth="0">
+                    {TABS.map((t) => (
+                      <Tabs.Trigger key={t.id} value={t.id} fontWeight="semibold" h="full">
+                        {t.label}
+                      </Tabs.Trigger>
+                    ))}
+                  </Tabs.List>
+                </Tabs.Root>
               </>
             )}
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <button
-              onClick={toggleTheme}
-              className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-              aria-label={theme === 'dark' ? 'เปลี่ยนเป็นโหมดสว่าง' : 'เปลี่ยนเป็นโหมดมืด'}
-              title={theme === 'dark' ? 'โหมดสว่าง (สำหรับเวทีที่แสงจ้า)' : 'โหมดมืด'}
-            >
-              {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
-            </button>
-          </div>
-        </header>
+          </HStack>
+          <IconButton
+            variant="ghost"
+            size="sm"
+            color="fg.muted"
+            onClick={toggleTheme}
+            aria-label={theme === 'dark' ? 'เปลี่ยนเป็นโหมดสว่าง' : 'เปลี่ยนเป็นโหมดมืด'}
+            title={theme === 'dark' ? 'โหมดสว่าง (สำหรับเวทีที่แสงจ้า)' : 'โหมดมืด'}
+          >
+            {theme === 'dark' ? <Sun /> : <Moon />}
+          </IconButton>
+        </Flex>
 
         {bands.error ? (
-          <p className="p-6 text-danger">{bands.error}</p>
+          <Text p="6" color="fg.error">
+            {bands.error}
+          </Text>
         ) : !bands.data ? null : !band || creatingBand ? (
           <BandOnboarding
             first={!band}
@@ -174,7 +184,7 @@ function App(): React.JSX.Element {
             }}
           />
         )}
-      </div>
+      </Flex>
     </ToastProvider>
   )
 }

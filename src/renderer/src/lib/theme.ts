@@ -11,9 +11,17 @@ function readTheme(): Theme {
   }
 }
 
+/** Chakra's `_dark` condition follows the `dark` class on <html>. */
+function applyTheme(theme: Theme): void {
+  const root = document.documentElement
+  root.classList.toggle('dark', theme === 'dark')
+  root.classList.toggle('light', theme === 'light')
+  root.style.colorScheme = theme
+}
+
 /** Call before the first render so the window never flashes the wrong theme. */
 export function applyStoredTheme(): void {
-  document.documentElement.dataset.theme = readTheme()
+  applyTheme(readTheme())
 }
 
 export function useTheme(): [Theme, () => void] {
@@ -21,7 +29,7 @@ export function useTheme(): [Theme, () => void] {
   const toggle = useCallback(() => {
     setTheme((current) => {
       const next: Theme = current === 'dark' ? 'light' : 'dark'
-      document.documentElement.dataset.theme = next
+      applyTheme(next)
       try {
         localStorage.setItem(KEY, next)
       } catch {

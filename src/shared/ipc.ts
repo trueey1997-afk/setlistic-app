@@ -10,7 +10,9 @@ import type {
   SetlistSummary,
   Song,
   SongInput,
-  SongQuery
+  SongQuery,
+  StemsState,
+  StemsTools
 } from './types'
 
 /**
@@ -53,6 +55,16 @@ export interface SetlisticApi {
     reorder(setlistId: number, itemIds: number[]): Promise<SetlistDetail>
     setProgress(itemId: number, memberId: number, status: PracticeStatus): Promise<SetlistDetail>
     setPlayed(itemId: number, played: boolean): Promise<SetlistDetail>
+  }
+  stems: {
+    /** Checks that Python, yt-dlp, Demucs and ffmpeg are installed. */
+    tools(): Promise<StemsTools>
+    get(songId: number): Promise<StemsState>
+    /** Starts splitting the song's YouTube audio; poll `get` for progress. */
+    process(songId: number): Promise<StemsState>
+    /** Stops a running job, or dismisses a failed one. */
+    cancel(songId: number): Promise<void>
+    remove(songId: number): Promise<void>
   }
   system: {
     /** Clipboard lives in the main process; the sandboxed renderer can't reach it reliably. */
@@ -99,6 +111,7 @@ export const API_METHODS = {
     setProgress: true,
     setPlayed: true
   },
+  stems: { tools: true, get: true, process: true, cancel: true, remove: true },
   system: { copyText: true, openExternal: true }
 } as const satisfies { [N in Namespace]: { [M in keyof SetlisticApi[N]]: true } }
 

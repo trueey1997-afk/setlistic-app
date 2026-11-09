@@ -30,6 +30,7 @@ import { InstrumentNotes } from './InstrumentNotes'
 import { KeyChords } from './KeyChords'
 import { SongFormDialog } from './SongForm'
 import { SongLinks, SongStatusBadge } from './links'
+import { StemsPanel } from './Stems'
 import { ChordPane, WIDE, YouTubePlayer } from './SongMedia'
 import { useRun } from './toast'
 import { Badge, EmptyState, ListRow, SearchGroup, SidePane } from './ui'
@@ -242,51 +243,51 @@ function SongDetail({
   return (
     // Container queries: the split depends on the pane's width, which the sidebar changes
     <Stack as="article" containerType="inline-size" mx="auto" maxW="1600px" gap="5" p="6">
-      <Flex
-        as="header"
-        wrap="wrap"
-        align="flex-start"
-        justify="space-between"
-        columnGap="6"
-        rowGap="3"
-      >
-        <Box minW="0" flex="1">
-          <Heading size="3xl" wordBreak="break-word">
-            {song.title}
-          </Heading>
-          <Text mt="1" color="fg.muted">
-            {song.artist || '—'}
-          </Text>
-          <Wrap mt="3" align="center" gap="1.5">
+      {/* Header: reference video on the left, song details beside it */}
+      <Flex as="header" wrap="wrap" align="flex-start" columnGap="6" rowGap="4">
+        <Box w="full" flexShrink={0} css={{ [WIDE]: { width: '360px' } }}>
+          <YouTubePlayer url={song.youtubeUrl} title={song.title} />
+        </Box>
+        <Stack minW="0" flex="1" gap="4">
+          <Flex wrap="wrap" align="flex-start" justify="space-between" columnGap="6" rowGap="3">
+            <Box minW="0" flex="1">
+              <Heading size="3xl" wordBreak="break-word">
+                {song.title}
+              </Heading>
+              <Text mt="1" color="fg.muted">
+                {song.artist || '—'}
+              </Text>
+            </Box>
+            <HStack flexShrink={0} gap="1">
+              <Button variant="outline" onClick={onEdit}>
+                <Pencil /> แก้ไข
+              </Button>
+              <IconButton variant="ghost" colorPalette="red" onClick={onDelete} aria-label="ลบเพลง">
+                <Trash2 />
+              </IconButton>
+            </HStack>
+          </Flex>
+          <Wrap align="center" gap="1.5">
             <SongStatusBadge status={song.status} />
             {song.tags.map((t) => (
               <Badge key={t}>#{t}</Badge>
             ))}
             <SongLinks youtubeUrl={song.youtubeUrl} chordUrl={song.chordUrl} />
           </Wrap>
-        </Box>
-        <HStack as="dl" flexShrink={0} gap="6" fontFamily="mono">
-          <Stat label="KEY" value={song.key ?? '–'} accent />
-          <Stat label="BPM" value={song.bpm?.toString() ?? '–'} />
-          <Stat label="TIME" value={formatClock(song.durationSec)} />
-        </HStack>
-        <HStack flexShrink={0} gap="1">
-          <Button variant="outline" onClick={onEdit}>
-            <Pencil /> แก้ไข
-          </Button>
-          <IconButton variant="ghost" colorPalette="red" onClick={onDelete} aria-label="ลบเพลง">
-            <Trash2 />
-          </IconButton>
-        </HStack>
+          <HStack as="dl" gap="6" fontFamily="mono">
+            <Stat label="KEY" value={song.key ?? '–'} accent />
+            <Stat label="BPM" value={song.bpm?.toString() ?? '–'} />
+            <Stat label="TIME" value={formatClock(song.durationSec)} />
+          </HStack>
+          {song.notes && (
+            <Text borderLeftWidth="2px" borderColor="brand.solid" pl="3" fontSize="sm">
+              {song.notes}
+            </Text>
+          )}
+        </Stack>
       </Flex>
 
-      {song.notes && (
-        <Text borderLeftWidth="2px" borderColor="brand.solid" pl="3" fontSize="sm">
-          {song.notes}
-        </Text>
-      )}
-
-      {/* 65 / 35 split once there's room; stacked (player first) in a narrow pane */}
+      {/* 65 / 35 split once there's room: chords | stems, chords in key, notes */}
       <Grid
         alignItems="start"
         gap="6"
@@ -295,20 +296,18 @@ function SongDetail({
         <ChordPane key={song.id} chordUrl={song.chordUrl} content={song.content} />
         <Stack
           as="aside"
-          order="-1"
           gap="6"
           css={{
             [WIDE]: {
               position: 'sticky',
               top: '1.5rem',
-              order: 0,
               maxHeight: 'calc(100vh - 6rem)',
               overflowY: 'auto'
             }
           }}
         >
           <Stack gap="2">
-            <YouTubePlayer url={song.youtubeUrl} title={song.title} />
+            <StemsPanel key={song.id} song={song} />
             <KeyChords musicalKey={song.key} compact />
           </Stack>
           <InstrumentNotes song={song} members={members} onChange={onChange} />

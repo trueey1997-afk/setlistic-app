@@ -7,8 +7,12 @@ import { createBandRepository } from './db/bandRepository'
 import { createSongRepository } from './db/songRepository'
 import { createSetlistRepository } from './db/setlistRepository'
 import { createHandlers, registerIpc } from './ipc'
+import { createStemsService, registerStemsScheme, type StemsService } from './stems'
 
 let db: Db | undefined
+let stems: StemsService | undefined
+
+registerStemsScheme()
 
 /** True only for our own renderer: the dev server in development, the bundled file otherwise. */
 function isAppUrl(url: string): boolean {
@@ -99,8 +103,9 @@ app.whenReady().then(() => {
   // One local database per OS user, e.g. %APPDATA%\setlistic\setlistic.db on Windows
   db = openDatabase(join(app.getPath('userData'), 'setlistic.db'))
   const songs = createSongRepository(db)
+  stems = createStemsService(join(app.getPath('userData'), 'stems'))
   registerIpc(
-    createHandlers(createBandRepository(db), songs, createSetlistRepository(db, songs)),
+    createHandlers(createBandRepository(db), songs, createSetlistRepository(db, songs), stems),
     isTrustedSender
   )
 
@@ -116,5 +121,6 @@ app.on('window-all-closed', () => {
 })
 
 app.on('will-quit', () => {
+  stems?.shutdown()
   db?.close()
 })

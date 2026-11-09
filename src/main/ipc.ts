@@ -12,6 +12,7 @@ import type { BandRepository } from './db/bandRepository'
 import type { SongRepository } from './db/songRepository'
 import type { SetlistRepository } from './db/setlistRepository'
 import { NotFoundError } from './db/errors'
+import type { StemsService } from './stems'
 
 // ── Validation: the renderer is treated as untrusted input ──
 
@@ -83,7 +84,8 @@ const itemInput = z.object({
 export function createHandlers(
   bands: BandRepository,
   songs: SongRepository,
-  setlists: SetlistRepository
+  setlists: SetlistRepository,
+  stems: StemsService
 ): IpcHandlers {
   const memberBand = (memberId: number | null): number | null =>
     memberId === null ? null : bands.bandOfMember(memberId)
@@ -106,7 +108,11 @@ export function createHandlers(
       get: (songId) => songs.get(id.parse(songId)),
       create: (bandId, input) => songs.create(id.parse(bandId), songInput.parse(input)),
       update: (songId, input) => songs.update(id.parse(songId), songInput.parse(input)),
-      remove: (songId) => songs.remove(id.parse(songId)),
+      remove: async (songId) => {
+        const songIdNum = id.parse(songId)
+        songs.remove(songIdNum)
+        await stems.remove(songIdNum)
+      },
       addNote: (songId, input) => {
         const note = noteInput.parse(input)
         return songs.addNote(id.parse(songId), note, memberBand(note.memberId))
@@ -135,6 +141,19 @@ export function createHandlers(
           z.enum(PRACTICE_STATUSES).parse(status)
         ),
       setPlayed: (itemId, played) => setlists.setPlayed(id.parse(itemId), z.boolean().parse(played))
+    },
+    stems: {
+      tools: () => stems.tools(),
+      get: (songId) => stems.get(id.parse(songId)),
+      process: async (songId) => {
+        const song = songs.get(id.parse(songId))
+        if (!song.youtubeUrl) throw new Error('เพลงนี้ยังไม่มีลิงก์ YouTube')
+        const tools = await stems.tools()
+        if (!tools.ready) throw new Error(`ยังไม่ได้ติดตั้ง: ${tools.missing.join(', ')}`)
+        return stems.process(song.id, song.youtubeUrl)
+      },
+      cancel: (songId) => stems.cancel(id.parse(songId)),
+      remove: (songId) => stems.remove(id.parse(songId))
     },
     system: {
       copyText: (value) => clipboard.writeText(text(100_000).parse(value)),

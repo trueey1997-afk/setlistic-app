@@ -173,3 +173,37 @@ export interface SetlistItemInput {
   keyOverride: MusicalKey | null
   note: string
 }
+
+// ── Stems: one song split into 6 instrument tracks (Demucs htdemucs_6s) ──
+
+export const STEM_NAMES = ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'] as const
+export type StemName = (typeof STEM_NAMES)[number]
+export const STEM_LABEL: Record<StemName, string> = {
+  vocals: 'ร้อง',
+  drums: 'กลอง',
+  bass: 'เบส',
+  guitar: 'กีตาร์',
+  piano: 'เปียโน',
+  other: 'อื่นๆ'
+}
+
+/** download = fetching audio from YouTube; separate = Demucs splitting it. */
+export type StemsPhase = 'download' | 'separate'
+
+export interface StemsState {
+  status: 'none' | 'running' | 'ready' | 'error'
+  phase: StemsPhase | null
+  /** 0–1 within the current phase. */
+  progress: number
+  error: string | null
+  /** YouTube link the stems were made from, to spot a changed link. */
+  sourceUrl: string | null
+  /** `stems://` URLs, one per stem, once ready. */
+  stems: { name: StemName; url: string }[]
+}
+
+export interface StemsTools {
+  ready: boolean
+  /** Human-readable names of what isn't installed. */
+  missing: string[]
+}

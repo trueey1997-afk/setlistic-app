@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Box, Button, Flex, HStack, IconButton, Stack, Text } from '@chakra-ui/react'
+import { Box, Button, Flex, HStack, Icon, IconButton, Stack, Text } from '@chakra-ui/react'
 import {
   Check,
   ChevronLeft,
@@ -14,7 +14,7 @@ import {
 import type { SetlistDetail, SetlistItem } from '@shared/types'
 import { formatClock } from '@shared/format'
 import { ChordPane } from './SongMedia'
-import { ListRow } from './ui'
+import { ListRow, selectedBar } from './ui'
 
 const ORDER_KEY = 'stage.showOrder'
 
@@ -132,51 +132,43 @@ export function StageMode({
       inset="0"
       zIndex="overlay"
       direction="column"
-      bg="bg"
-      color="fg"
+      bg="bg.canvas"
+      color="fg.default"
+      // Stage density: 56px rows, 48px controls, 24px icons (theme/system.ts)
+      data-density="stage"
     >
       {/* ── Top bar: the current song's details live here so the chords get the height ── */}
       <HStack
         as="header"
         position="relative"
         flexShrink={0}
-        gap="3"
+        gap="4"
         borderBottomWidth="1px"
-        px="3"
+        px="panel.px"
         py="2"
       >
         <StageButton label="ออกจากโหมดเล่นสด (Esc)" onClick={onClose}>
           <X />
         </StageButton>
         <Text
-          fontFamily="mono"
-          fontSize="3xl"
-          lineHeight="1"
-          fontWeight="bold"
-          color="brand.fg"
-          fontVariantNumeric="tabular-nums"
+          textStyle="stage.stat"
+          color="accent.fg"
           title={`${setlist.name} · เล่นแล้ว ${playedCount}/${items.length}`}
         >
           {String(index + 1).padStart(2, '0')}
         </Text>
         <Box minW="0" flex="1">
-          <Text as="h1" truncate fontSize="2xl" lineHeight="shorter" fontWeight="bold">
+          <Text as="h1" truncate textStyle="stage.title">
             {song.title}
           </Text>
-          <Text truncate fontSize="sm" color="fg.muted">
+          <Text truncate textStyle="stage.label">
             {song.artist || '—'}
-            <Text
-              as="span"
-              ml="2"
-              fontFamily="mono"
-              fontSize="xs"
-              fontVariantNumeric="tabular-nums"
-            >
+            <Text as="span" ml="2" fontVariantNumeric="tabular-nums">
               · {setlist.name} · {playedCount}/{items.length}
             </Text>
           </Text>
         </Box>
-        <HStack as="dl" flexShrink={0} gap="5" fontFamily="mono">
+        <HStack as="dl" flexShrink={0} gap="6">
           <StageStat
             label={changedKey ? `KEY (เดิม ${song.key ?? '–'})` : 'KEY'}
             value={key ?? '–'}
@@ -195,10 +187,10 @@ export function StageMode({
           {fullscreen ? <Minimize /> : <Maximize />}
         </StageButton>
         {/* Set progress as a hairline along the bottom edge */}
-        <Box position="absolute" insetX="0" bottom="-1px" h="0.5" bg="bg.muted">
+        <Box position="absolute" insetX="0" bottom="-1px" h="1" bg="bg.muted">
           <Box
             h="full"
-            bg="brand.solid"
+            bg="accent.solid"
             transition="width 0.2s"
             style={{ width: `${(playedCount / items.length) * 100}%` }}
           />
@@ -207,24 +199,23 @@ export function StageMode({
 
       <Flex minH="0" flex="1">
         {/* ── Chords ── */}
-        <Stack as="main" minW="0" flex="1" gap="2" p="2">
+        <Stack as="main" minW="0" flex="1" gap="2" p="panel.px">
           {(current.note || song.notes) && (
             <Flex
               wrap="wrap"
               align="center"
               columnGap="4"
-              rowGap="0.5"
-              rounded="md"
-              borderLeftWidth="4px"
-              borderColor="brand.solid"
-              bg="brand.subtle"
-              px="3"
-              py="1.5"
+              rowGap="1"
+              rounded="chip"
+              bg="accent.subtle"
+              px="panel.px"
+              py="2"
+              {...selectedBar(true, '1')}
             >
-              {current.note && <Text fontWeight="semibold">{current.note}</Text>}
+              {current.note && <Text textStyle="stage.cue">{current.note}</Text>}
               {song.notes && (
-                <HStack gap="1.5" fontSize="sm" color="fg.muted">
-                  <StickyNote size={14} /> {song.notes}
+                <HStack gap="2" fontSize="lg" color="fg.muted">
+                  <StickyNote size={24} /> {song.notes}
                 </HStack>
               )}
             </Flex>
@@ -238,26 +229,23 @@ export function StageMode({
           as="aside"
           aria-label="ลำดับเพลง"
           display={showOrder ? 'flex' : 'none'}
-          w="64"
+          w="pane.stageOrder"
           flexShrink={0}
           direction="column"
           borderLeftWidth="1px"
         >
           {next && (
-            <Box borderBottomWidth="1px" px="4" py="3">
-              <Text
-                fontSize="xs"
-                fontWeight="bold"
-                letterSpacing="widest"
-                color="fg.muted"
-                textTransform="uppercase"
-              >
-                ถัดไป
-              </Text>
-              <Text truncate fontSize="lg" fontWeight="bold">
+            <Box borderBottomWidth="1px" px="panel.px" py="3">
+              <Text textStyle="stage.label">ถัดไป</Text>
+              <Text truncate textStyle="title.section">
                 {next.song.title}
               </Text>
-              <Text fontFamily="mono" fontSize="sm" color="brand.fg">
+              <Text
+                fontFamily="mono"
+                fontSize="sm"
+                color="accent.fg"
+                fontVariantNumeric="tabular-nums"
+              >
                 Key {next.keyOverride || next.song.key || '–'}
                 {next.song.bpm && (
                   <Text as="span" color="fg.muted">
@@ -268,25 +256,30 @@ export function StageMode({
               </Text>
             </Box>
           )}
-          <Box as="ol" minH="0" flex="1" overflowY="auto" py="1">
+          <Box as="ol" minH="0" flex="1" overflowY="auto">
             {items.map((it, i) => (
               <li key={it.id}>
                 <ListRow
                   selected={i === index}
-                  borderWidth="4px"
-                  px="4"
+                  barWidth="1"
                   onClick={() => setIndex(i)}
                   color={it.played && i !== index ? 'fg.muted' : undefined}
                 >
                   <Box
-                    w="6"
+                    w="8"
                     flexShrink={0}
                     fontFamily="mono"
                     fontSize="sm"
                     fontWeight="bold"
                     fontVariantNumeric="tabular-nums"
                   >
-                    {it.played ? <Check size={16} color="var(--chakra-colors-green-500)" /> : i + 1}
+                    {it.played ? (
+                      <Icon color="success.fg" boxSize="icon.size">
+                        <Check aria-label="เล่นแล้ว" />
+                      </Icon>
+                    ) : (
+                      i + 1
+                    )}
                   </Box>
                   <Text
                     minW="0"
@@ -296,7 +289,13 @@ export function StageMode({
                   >
                     {it.song.title}
                   </Text>
-                  <Text flexShrink={0} fontFamily="mono" fontSize="xs" color="fg.muted">
+                  <Text
+                    flexShrink={0}
+                    fontFamily="mono"
+                    fontSize="sm"
+                    color="fg.muted"
+                    textAlign="right"
+                  >
                     {it.keyOverride || it.song.key}
                   </Text>
                 </ListRow>
@@ -307,14 +306,15 @@ export function StageMode({
       </Flex>
 
       {/* ── Big controls, easy to hit mid-song ── */}
-      <HStack as="footer" flexShrink={0} gap="2" borderTopWidth="1px" px="2" py="1.5">
-        <Button size="lg" variant="outline" onClick={goPrev} disabled={index === 0}>
+      <HStack as="footer" flexShrink={0} gap="2" borderTopWidth="1px" px="panel.px" py="2">
+        <Button size="lg" h="control.h" variant="outline" onClick={goPrev} disabled={index === 0}>
           <ChevronLeft /> ก่อนหน้า
         </Button>
         <Button
           size="lg"
+          h="control.h"
           variant={current.played ? 'surface' : 'outline'}
-          colorPalette={current.played ? 'green' : 'gray'}
+          colorPalette={current.played ? 'success' : 'gray'}
           onClick={() => onPlayed(current, !current.played)}
           aria-pressed={current.played}
         >
@@ -332,7 +332,8 @@ export function StageMode({
         </Text>
         <Button
           size="lg"
-          colorPalette="brand"
+          h="control.h"
+          colorPalette="accent"
           ml="auto"
           maxW="md"
           minW="56"
@@ -364,8 +365,10 @@ function StageButton({
   return (
     <IconButton
       variant="ghost"
-      size="md"
+      size="lg"
+      boxSize="control.h"
       color="fg.muted"
+      _icon={{ boxSize: 'icon.size' }}
       onClick={onClick}
       aria-label={label}
       title={label}
@@ -384,13 +387,13 @@ function StageStat({
   value: string
   tone?: 'primary' | 'warning'
 }): React.JSX.Element {
-  const color = tone === 'primary' ? 'brand.fg' : tone === 'warning' ? 'orange.fg' : undefined
+  const color = tone === 'primary' ? 'accent.fg' : tone === 'warning' ? 'warning.fg' : undefined
   return (
     <Stack gap="0">
-      <Text as="dt" fontSize="10px" letterSpacing="widest" color="fg.muted">
+      <Text as="dt" textStyle="stage.label">
         {label}
       </Text>
-      <Text as="dd" fontSize="2xl" lineHeight="shorter" fontWeight="bold" color={color}>
+      <Text as="dd" textStyle="stage.stat" textAlign="right" color={color}>
         {value}
       </Text>
     </Stack>

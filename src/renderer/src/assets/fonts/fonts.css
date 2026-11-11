@@ -1,0 +1,47 @@
+/*
+ * LINE Seed Sans TH v1.003 (web build) — © LY Corporation, SIL Open Font License 1.1 (OFL.txt).
+ * Bundled with the app so it renders the same with no internet.
+ *
+ * The family ships Thin, Regular, Bold, ExtraBold and Heavy. Medium (500) and SemiBold (600),
+ * which Chakra uses a lot, are mapped onto the nearest face so text never falls back to a
+ * faux-bold: 500 → Regular, 600 → Bold.
+ */
+@font-face {
+  font-family: 'LINE Seed Sans TH';
+  src: url('./LINESeedSansTH_W_Th.woff2') format('woff2');
+  font-weight: 100 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'LINE Seed Sans TH';
+  src: url('./LINESeedSansTH_W_Rg.woff2') format('woff2');
+  font-weight: 400 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'LINE Seed Sans TH';
+  src: url('./LINESeedSansTH_W_Bd.woff2') format('woff2');
+  font-weight: 600 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'LINE Seed Sans TH';
+  src: url('./LINESeedSansTH_W_XBd.woff2') format('woff2');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'LINE Seed Sans TH';
+  src: url('./LINESeedSansTH_W_He.woff2') format('woff2');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}

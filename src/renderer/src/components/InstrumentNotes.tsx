@@ -5,9 +5,7 @@ import {
   chakra,
   Collapsible,
   Flex,
-  Heading,
   HStack,
-  IconButton,
   Input,
   NativeSelect,
   Stack,
@@ -26,17 +24,20 @@ import {
 } from '@shared/types'
 import { TabLink } from './links'
 import { useRun } from './toast'
-import { SectionLabel } from './ui'
+import { RowAction, SectionLabel } from './ui'
 
 /** Per-member, per-instrument notes and tab links for one song. */
 export function InstrumentNotes({
   song,
   members,
-  onChange
+  onChange,
+  bare
 }: {
   song: Song
   members: Member[]
   onChange: (song: Song) => void
+  /** Leave out the section label (when a fold header already names it) */
+  bare?: boolean
 }): React.JSX.Element {
   const run = useRun()
   const [editing, setEditing] = useState<number | null>(null)
@@ -53,14 +54,14 @@ export function InstrumentNotes({
   })).filter((g) => g.notes.length > 0)
 
   return (
-    <Stack as="section" gap="4" borderTopWidth="1px" pt="6">
-      <SectionLabel>โน้ตรายเครื่องดนตรี</SectionLabel>
+    <Stack as="section" gap="3">
+      {!bare && <SectionLabel>โน้ตรายเครื่องดนตรี</SectionLabel>}
 
       {groups.map(({ inst, notes }) => (
         <Stack key={inst} gap="2">
-          <Heading as="h3" size="sm">
+          <Text as="h4" textStyle="title.item">
             {INSTRUMENT_LABEL[inst]}
-          </Heading>
+          </Text>
           {notes.map((note) =>
             editing === note.id ? (
               <NoteForm
@@ -74,15 +75,7 @@ export function InstrumentNotes({
                 }}
               />
             ) : (
-              <Flex
-                key={note.id}
-                align="flex-start"
-                gap="3"
-                rounded="md"
-                bg="bg.muted"
-                px="3"
-                py="2"
-              >
+              <Flex key={note.id} align="flex-start" gap="3" rounded="inset" bg="bg.muted" p="3">
                 <Box minW="0" flex="1" fontSize="sm">
                   <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
                     {note.member?.name ?? 'ไม่ระบุ'}
@@ -90,31 +83,25 @@ export function InstrumentNotes({
                   {note.note && <Text whiteSpace="pre-wrap">{note.note}</Text>}
                   {note.tabUrl && <TabLink href={note.tabUrl} />}
                 </Box>
-                <IconButton
-                  variant="ghost"
-                  color="fg.muted"
-                  onClick={() => setEditing(note.id)}
-                  aria-label="แก้ไขโน้ต"
-                >
+                <RowAction label="แก้ไขโน้ต" onClick={() => setEditing(note.id)}>
                   <Pencil />
-                </IconButton>
-                <IconButton
-                  variant="ghost"
-                  colorPalette="red"
-                  aria-label="ลบโน้ต"
+                </RowAction>
+                <RowAction
+                  label="ลบโน้ต"
+                  colorPalette="danger"
                   onClick={() => {
                     if (confirm('ลบโน้ตนี้?')) save(window.setlistic.songs.removeNote(note.id))
                   }}
                 >
                   <Trash2 />
-                </IconButton>
+                </RowAction>
               </Flex>
             )
           )}
         </Stack>
       ))}
 
-      <Collapsible.Root rounded="md" borderWidth="1px" borderStyle="dashed" p="3">
+      <Collapsible.Root rounded="inset" borderWidth="1px" borderStyle="dashed" p="3">
         <Collapsible.Trigger cursor="pointer" fontSize="sm" fontWeight="semibold">
           + เพิ่มโน้ต
         </Collapsible.Trigger>
@@ -219,7 +206,7 @@ function NoteForm({
             ยกเลิก
           </Button>
         )}
-        <Button type="submit" colorPalette="brand">
+        <Button type="submit" variant="subtle" colorPalette="accent">
           {note ? 'บันทึก' : 'เพิ่มโน้ต'}
         </Button>
       </HStack>

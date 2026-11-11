@@ -1,4 +1,4 @@
-import { HStack, Link, type LinkProps } from '@chakra-ui/react'
+import { HStack, Icon, Link, type LinkProps } from '@chakra-ui/react'
 import { CirclePlay, ExternalLink, FileMusic } from 'lucide-react'
 import { SONG_STATUS_LABEL, type SongStatus } from '@shared/types'
 import { Badge, type BadgeTone } from './ui'
@@ -19,13 +19,13 @@ export function ExternalA({
       alignItems="center"
       gap="1"
       rounded="sm"
-      px="1.5"
+      px="2"
       py="1"
       fontSize="xs"
       fontWeight="medium"
       color="fg.muted"
       textDecoration="none"
-      _hover={{ bg: 'bg.muted', color: 'fg', textDecoration: 'none' }}
+      _hover={{ bg: 'bg.muted', color: 'fg.default', textDecoration: 'none' }}
       css={{ '& svg': { width: '3.5', height: '3.5' } }}
       {...props}
     >
@@ -43,10 +43,13 @@ export function SongLinks({
 }): React.JSX.Element | null {
   if (!youtubeUrl && !chordUrl) return null
   return (
-    <HStack as="span" display="inline-flex" gap="0.5">
+    <HStack as="span" display="inline-flex" gap="1">
       {youtubeUrl && (
         <ExternalA href={youtubeUrl}>
-          <CirclePlay color="var(--chakra-colors-fg-error)" /> YouTube
+          <Icon color="danger.fg">
+            <CirclePlay />
+          </Icon>{' '}
+          YouTube
         </ExternalA>
       )}
       {chordUrl && (

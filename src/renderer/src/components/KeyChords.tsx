@@ -15,14 +15,14 @@ export function KeyChords({
   if (!musicalKey) return null
   const { chords, spelledAs, dominant } = chordsInKey(musicalKey)
   const strong = (text: string): React.JSX.Element => (
-    <Span fontFamily="mono" fontWeight="bold" color="fg">
+    <Span fontFamily="mono" fontWeight="bold" color="fg.default">
       {text}
     </Span>
   )
 
   return (
     <Stack
-      rounded="lg"
+      rounded="inset"
       borderWidth="1px"
       bg="bg.subtle"
       gap={compact ? '1.5' : '2'}
@@ -33,7 +33,7 @@ export function KeyChords({
         คอร์ดในคีย์ {strong(musicalKey)}
         {spelledAs && ` (เขียนแบบ ${spelledAs} จะอ่านง่ายกว่า)`}
         <Span ml="2" display="inline-flex" alignItems="center" gap="1">
-          · <Span display="inline-block" boxSize="2.5" rounded="sm" bg="brand.solid" /> คอร์ดหลัก
+          · <Span display="inline-block" boxSize="2.5" rounded="xs" bg="accent.solid" /> คอร์ดหลัก
         </Span>
       </Text>
       <Grid as="ul" templateColumns="repeat(7, minmax(0, 1fr))" gap={compact ? '1' : '1.5'}>
@@ -45,18 +45,15 @@ export function KeyChords({
             minW="0"
             align="center"
             gap="0"
-            rounded="md"
+            rounded="chip"
             borderWidth="1px"
-            px="0.5"
+            px="1"
             py={compact ? '1' : '1.5'}
             {...(c.primary
-              ? { borderColor: 'brand.solid', bg: 'brand.solid', color: 'brand.contrast' }
-              : { bg: 'bg' })}
+              ? { borderColor: 'accent.solid', bg: 'accent.solid', color: 'accent.contrast' }
+              : { bg: 'bg.canvas' })}
           >
-            <Box
-              fontSize={compact ? '9px' : '10px'}
-              {...(c.primary ? { opacity: 0.8 } : { color: 'fg.muted' })}
-            >
+            <Box fontSize="xs" {...(c.primary ? { opacity: 0.8 } : { color: 'fg.muted' })}>
               {c.degree}
             </Box>
             <Box

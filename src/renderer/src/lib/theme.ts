@@ -1,42 +1,84 @@
-import { useCallback, useState } from 'react'
+import { useSyncExternalStore } from 'react'
+import { ACCENTS, THEMES, type AccentName, type ThemeName } from '@renderer/theme/palette'
 
-export type Theme = 'dark' | 'light'
-const KEY = 'setlistic-theme'
+export type { AccentName, ThemeName }
 
-function readTheme(): Theme {
+export type ThemeSettings = { theme: ThemeName; accent: AccentName }
+
+const THEME_KEY = 'setlistic-theme'
+const ACCENT_KEY = 'setlistic-accent'
+const DEFAULTS: ThemeSettings = { theme: 'dark', accent: 'lime' }
+
+function read<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
   try {
-    return localStorage.getItem(KEY) === 'light' ? 'light' : 'dark'
+    const value = localStorage.getItem(key) as T | null
+    return value && allowed.includes(value) ? value : fallback
   } catch {
-    return 'dark'
+    return fallback
   }
 }
 
-/** Chakra's `_dark` condition follows the `dark` class on <html>. */
-function applyTheme(theme: Theme): void {
+function write(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value)
+  } catch {
+    // Still applies for this session
+  }
+}
+
+let current: ThemeSettings = {
+  theme: read(THEME_KEY, THEMES, DEFAULTS.theme),
+  accent: read(ACCENT_KEY, ACCENTS, DEFAULTS.accent)
+}
+const listeners = new Set<() => void>()
+
+/**
+ * Puts the theme on <html>, which is what the semantic tokens in theme/system.ts key off:
+ * light → `light`, dark → `dark`, stage → `dark stage`; accent → `data-accent`
+ * (dropped in stage, whose accent is fixed red to protect night vision).
+ */
+function apply({ theme, accent }: ThemeSettings): void {
   const root = document.documentElement
-  root.classList.toggle('dark', theme === 'dark')
   root.classList.toggle('light', theme === 'light')
-  root.style.colorScheme = theme
+  root.classList.toggle('dark', theme !== 'light')
+  root.classList.toggle('stage', theme === 'stage')
+  if (theme === 'stage') root.removeAttribute('data-accent')
+  else root.setAttribute('data-accent', accent)
+  root.style.colorScheme = theme === 'light' ? 'light' : 'dark'
+}
+
+function update(next: Partial<ThemeSettings>): void {
+  current = { ...current, ...next }
+  write(THEME_KEY, current.theme)
+  write(ACCENT_KEY, current.accent)
+  apply(current)
+  listeners.forEach((l) => l())
 }
 
 /** Call before the first render so the window never flashes the wrong theme. */
 export function applyStoredTheme(): void {
-  applyTheme(readTheme())
+  apply(current)
 }
 
-export function useTheme(): [Theme, () => void] {
-  const [theme, setTheme] = useState<Theme>(readTheme)
-  const toggle = useCallback(() => {
-    setTheme((current) => {
-      const next: Theme = current === 'dark' ? 'light' : 'dark'
-      applyTheme(next)
-      try {
-        localStorage.setItem(KEY, next)
-      } catch {
-        // Theme still switches for this session
-      }
-      return next
-    })
-  }, [])
-  return [theme, toggle]
+export function setTheme(theme: ThemeName): void {
+  update({ theme })
+}
+
+export function setAccent(accent: AccentName): void {
+  update({ accent })
+}
+
+/** Steps dark → light → stage → dark (for a keyboard shortcut). */
+export function cycleTheme(): void {
+  setTheme(THEMES[(THEMES.indexOf(current.theme) + 1) % THEMES.length])
+}
+
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener)
+  return () => listeners.delete(listener)
+}
+
+/** Current theme and accent; every component using it re-renders on change. */
+export function useThemeSettings(): ThemeSettings {
+  return useSyncExternalStore(subscribe, () => current)
 }

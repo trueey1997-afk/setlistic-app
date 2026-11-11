@@ -5,16 +5,29 @@ import {
   Center,
   Flex,
   Grid,
-  Heading,
   HStack,
-  IconButton,
   Input,
+  Menu,
   NativeSelect,
+  Portal,
   Stack,
   Text,
   Wrap
 } from '@chakra-ui/react'
-import { Music, Pencil, Plus, Trash2 } from 'lucide-react'
+import {
+  AudioLines,
+  CirclePlay,
+  ExternalLink,
+  Info,
+  Eye,
+  EyeOff,
+  MoreHorizontal,
+  Music,
+  NotebookPen,
+  Pencil,
+  Plus,
+  Trash2
+} from 'lucide-react'
 import {
   MUSICAL_KEYS,
   SONG_STATUSES,
@@ -24,25 +37,53 @@ import {
   type Song,
   type SongStatus
 } from '@shared/types'
-import { formatClock } from '@shared/format'
+import { formatClock, formatTotal } from '@shared/format'
 import { useAsync } from '@renderer/hooks/useAsync'
 import { InstrumentNotes } from './InstrumentNotes'
 import { KeyChords } from './KeyChords'
 import { SongFormDialog } from './SongForm'
 import { SongLinks, SongStatusBadge } from './links'
 import { StemsPanel } from './Stems'
-import { ChordPane, WIDE, YouTubePlayer } from './SongMedia'
+import {
+  ChordControls,
+  ChordSourceSwitch,
+  ChordView,
+  ChordWebNav,
+  YouTubePlayer
+} from './SongMedia'
+import { useChordShortcuts, useChordViewer } from '@renderer/hooks/useChordViewer'
+import {
+  InspectorToggle,
+  RailItem,
+  Shell,
+  ShellInspector,
+  ShellMain,
+  ShellRail,
+  ShellSidebar,
+  SidebarCollapse,
+  useShell
+} from './shell'
 import { useRun } from './toast'
-import { Badge, EmptyState, ListRow, SearchGroup, SidePane } from './ui'
+import {
+  Badge,
+  EmptyState,
+  FoldSection,
+  KeyValue,
+  KeyValueList,
+  ListRow,
+  PanelAction,
+  PanelBody,
+  PanelFooter,
+  PanelHeader,
+  PanelToolbar,
+  SearchGroup,
+  SectionLabel
+} from './ui'
 
-export function SongLibrary({
-  bandId,
-  sidebarOpen
-}: {
-  bandId: number
-  sidebarOpen: boolean
-}): React.JSX.Element {
+export function SongLibrary({ bandId }: { bandId: number }): React.JSX.Element {
   const run = useRun()
+  const shell = useShell()
+  const { requestSearch, searchTick } = shell
   const [search, setSearch] = useState('')
   const [key, setKey] = useState<MusicalKey | ''>('')
   const [status, setStatus] = useState<SongStatus | ''>('')
@@ -61,22 +102,33 @@ export function SongLibrary({
   const searchRef = useRef<HTMLInputElement>(null)
 
   const selected = songs.data?.find((s) => s.id === selectedId) ?? null
+  const totalSec = songs.data?.reduce((sum, s) => sum + (s.durationSec ?? 0), 0) ?? 0
 
-  // Desktop shortcuts: Ctrl+N new song, Ctrl+F search
+  // Desktop shortcuts: Ctrl+N new song, Ctrl+F search (same as Ctrl+K)
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
-      if (!(e.ctrlKey || e.metaKey)) return
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return
       if (e.key === 'n') {
         e.preventDefault()
         setEditing('new')
       } else if (e.key === 'f') {
         e.preventDefault()
-        searchRef.current?.focus()
+        requestSearch()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [requestSearch])
+
+  // Ctrl+K (shell) focuses this search
+  useEffect(() => {
+    if (searchTick) searchRef.current?.focus()
+  }, [searchTick])
+
+  function pick(id: number): void {
+    setSelectedId(id)
+    shell.showInspector()
+  }
 
   async function remove(song: Song): Promise<void> {
     if (!confirm(`ลบเพลง "${song.title}"?\nเพลงนี้จะถูกเอาออกจากทุกเซ็ตลิสต์ด้วย`)) return
@@ -86,16 +138,47 @@ export function SongLibrary({
   }
 
   return (
-    <Flex minH="0" flex="1">
-      {/* ── List pane ── */}
-      <SidePane open={sidebarOpen} label="รายการเพลง" w="380px">
-        <Stack gap="2" borderBottomWidth="1px" p="3">
+    <Shell>
+      <ShellSidebar
+        label="รายการเพลง"
+        rail={
+          <ShellRail>
+            {songs.data?.map((song) => (
+              <RailItem
+                key={song.id}
+                label={song.title}
+                selected={song.id === selectedId}
+                onClick={() => pick(song.id)}
+              >
+                <KeyTile musicalKey={song.key} />
+              </RailItem>
+            ))}
+          </ShellRail>
+        }
+      >
+        <PanelHeader
+          title="เพลง"
+          actions={
+            <>
+              <Button
+                colorPalette="accent"
+                onClick={() => setEditing('new')}
+                aria-keyshortcuts="Control+N"
+                title="Ctrl+N"
+              >
+                <Plus /> เพิ่มเพลง
+              </Button>
+              <SidebarCollapse />
+            </>
+          }
+        />
+        <PanelToolbar>
           <SearchGroup>
             <Input
               ref={searchRef}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="ค้นหาเพลง / ศิลปิน  (Ctrl+F)"
+              placeholder="ค้นหาเพลง / ศิลปิน  (Ctrl+K)"
               aria-label="ค้นหาเพลง"
             />
           </SearchGroup>
@@ -131,18 +214,15 @@ export function SongLibrary({
               <NativeSelect.Indicator />
             </NativeSelect.Root>
           </HStack>
-          <Button colorPalette="brand" onClick={() => setEditing('new')} title="Ctrl+N">
-            <Plus /> เพิ่มเพลง
-          </Button>
-        </Stack>
+        </PanelToolbar>
 
-        <Box minH="0" flex="1" overflowY="auto">
+        <PanelBody inset={false} gap="0">
           {songs.error ? (
-            <Text p="4" fontSize="sm" color="fg.error">
+            <Text px="panel.px" py="4" fontSize="sm" color="fg.error">
               {songs.error}
             </Text>
           ) : !songs.data ? null : songs.data.length === 0 ? (
-            <Text p="6" textAlign="center" fontSize="sm" color="fg.muted">
+            <Text px="panel.px" py="6" fontSize="sm" color="fg.muted">
               {search || key || status
                 ? 'ไม่พบเพลงที่ตรงกับการค้นหา'
                 : 'ยังไม่มีเพลง กด "เพิ่มเพลง" เพื่อเริ่ม'}
@@ -153,64 +233,59 @@ export function SongLibrary({
                 <li key={song.id}>
                   <ListRow
                     selected={song.id === selectedId}
-                    onClick={() => setSelectedId(song.id)}
+                    onClick={() => pick(song.id)}
                     onDoubleClick={() => setEditing(song)}
                   >
-                    <Center
-                      boxSize="10"
-                      flexShrink={0}
-                      rounded="sm"
-                      borderWidth="1px"
-                      bg="bg"
-                      fontFamily="mono"
-                      fontSize="sm"
-                      fontWeight="bold"
-                      color="brand.fg"
-                    >
-                      {song.key ?? '–'}
-                    </Center>
+                    <KeyTile musicalKey={song.key} />
                     <Box minW="0" flex="1">
-                      <Text truncate fontSize="sm" fontWeight="semibold">
+                      <Text truncate textStyle="title.item">
                         {song.title}
                       </Text>
-                      <Text truncate fontSize="xs" color="fg.muted">
+                      <Text truncate fontSize="xs" lineHeight="1rem" color="fg.muted">
                         {song.artist || '—'}
                       </Text>
                     </Box>
-                    <Stack flexShrink={0} align="flex-end" gap="1">
-                      <SongStatusBadge status={song.status} />
-                      <Text fontFamily="mono" fontSize="xs" color="fg.muted">
-                        {formatClock(song.durationSec)}
-                      </Text>
-                    </Stack>
+                    <Text
+                      flexShrink={0}
+                      textAlign="right"
+                      fontFamily="mono"
+                      fontSize="xs"
+                      color="fg.muted"
+                      fontVariantNumeric="tabular-nums"
+                    >
+                      {formatClock(song.durationSec)}
+                    </Text>
                   </ListRow>
                 </li>
               ))}
             </ul>
           )}
-        </Box>
+        </PanelBody>
 
-        {songs.data && (
-          <Text borderTopWidth="1px" px="3" py="2" fontFamily="mono" fontSize="xs" color="fg.muted">
-            {songs.data.length} เพลง
-          </Text>
-        )}
-      </SidePane>
+        <PanelFooter justifyContent="space-between">
+          {songs.data && (
+            <>
+              <Text as="span">{songs.data.length} เพลง</Text>
+              {totalSec > 0 && <Text as="span">รวม {formatTotal(totalSec)}</Text>}
+            </>
+          )}
+        </PanelFooter>
+      </ShellSidebar>
 
-      {/* ── Detail pane ── */}
-      <Box as="section" minW="0" flex="1" overflowY="auto">
-        {selected ? (
-          <SongDetail
-            song={selected}
-            members={band.data?.members ?? []}
-            onEdit={() => setEditing(selected)}
-            onDelete={() => remove(selected)}
-            onChange={() => songs.reload()}
-          />
-        ) : (
-          <EmptyState icon={<Music />} title="เลือกเพลงจากรายการเพื่อฟังเพลง ดูคอร์ด และโน้ต" />
-        )}
-      </Box>
+      {selected ? (
+        <SongDetail
+          key={selected.id}
+          song={selected}
+          members={band.data?.members ?? []}
+          onEdit={() => setEditing(selected)}
+          onDelete={() => remove(selected)}
+          onChange={() => songs.reload()}
+        />
+      ) : (
+        <ShellMain>
+          <EmptyState icon={<Music />} title="เลือกเพลงจากรายการเพื่อดูคอร์ด ฟังเพลง และโน้ต" />
+        </ShellMain>
+      )}
 
       <SongFormDialog
         bandId={bandId}
@@ -223,10 +298,87 @@ export function SongLibrary({
           songs.reload()
         }}
       />
-    </Flex>
+    </Shell>
   )
 }
 
+/** Key letter in a small tile: the song list and its rail. */
+function KeyTile({ musicalKey }: { musicalKey: MusicalKey | null }): React.JSX.Element {
+  return (
+    <Center
+      boxSize="8"
+      flexShrink={0}
+      rounded="chip"
+      borderWidth="1px"
+      bg="bg.panel"
+      fontFamily="mono"
+      fontSize="xs"
+      fontWeight="bold"
+      color="accent.fg"
+    >
+      {musicalKey ?? '–'}
+    </Center>
+  )
+}
+
+/** Chords hidden on the song page (for songs you only listen to); one setting for all songs. */
+const CHORDS_HIDDEN_KEY = 'setlistic-chords-hidden'
+
+function useStoredFlag(key: string): [boolean, (value: boolean) => void] {
+  const [value, setValue] = useState(() => {
+    try {
+      return localStorage.getItem(key) === '1'
+    } catch {
+      return false
+    }
+  })
+  function set(next: boolean): void {
+    setValue(next)
+    try {
+      localStorage.setItem(key, next ? '1' : '0')
+    } catch {
+      // Still applies for this session
+    }
+  }
+  return [value, set]
+}
+
+/** Which inspector sections are open; remembered across songs and launches. */
+const SECTIONS_KEY = 'setlistic-song-sections'
+type SectionId = 'youtube' | 'stems' | 'keyChords' | 'notes'
+const DEFAULT_SECTIONS: Record<SectionId, boolean> = {
+  youtube: true,
+  stems: false,
+  keyChords: false,
+  notes: false
+}
+
+function useOpenSections(): [Record<SectionId, boolean>, (id: SectionId, open: boolean) => void] {
+  const [open, setOpen] = useState<Record<SectionId, boolean>>(() => {
+    try {
+      return { ...DEFAULT_SECTIONS, ...JSON.parse(localStorage.getItem(SECTIONS_KEY) ?? '{}') }
+    } catch {
+      return DEFAULT_SECTIONS
+    }
+  })
+  function set(id: SectionId, value: boolean): void {
+    setOpen((prev) => {
+      const next = { ...prev, [id]: value }
+      try {
+        localStorage.setItem(SECTIONS_KEY, JSON.stringify(next))
+      } catch {
+        // Still folds for this session
+      }
+      return next
+    })
+  }
+  return [open, set]
+}
+
+/**
+ * One song. Main is the chord sheet (header · meta bar · sheet · auto-scroll footer); the
+ * inspector holds the details and the practice tools. Give it `key={song.id}`.
+ */
 function SongDetail({
   song,
   members,
@@ -240,100 +392,326 @@ function SongDetail({
   onDelete: () => void
   onChange: (song: Song) => void
 }): React.JSX.Element {
-  return (
-    // Container queries: the split depends on the pane's width, which the sidebar changes
-    <Stack as="article" containerType="inline-size" mx="auto" maxW="1600px" gap="5" p="6">
-      {/* Header: reference video on the left, song details beside it */}
-      <Flex as="header" wrap="wrap" align="flex-start" columnGap="6" rowGap="4">
-        <Box w="full" flexShrink={0} css={{ [WIDE]: { width: '360px' } }}>
-          <YouTubePlayer url={song.youtubeUrl} title={song.title} />
-        </Box>
-        <Stack minW="0" flex="1" gap="4">
-          <Flex wrap="wrap" align="flex-start" justify="space-between" columnGap="6" rowGap="3">
-            <Box minW="0" flex="1">
-              <Heading size="3xl" wordBreak="break-word">
-                {song.title}
-              </Heading>
-              <Text mt="1" color="fg.muted">
-                {song.artist || '—'}
-              </Text>
-            </Box>
-            <HStack flexShrink={0} gap="1">
-              <Button variant="outline" onClick={onEdit}>
-                <Pencil /> แก้ไข
-              </Button>
-              <IconButton variant="ghost" colorPalette="red" onClick={onDelete} aria-label="ลบเพลง">
-                <Trash2 />
-              </IconButton>
-            </HStack>
-          </Flex>
-          <Wrap align="center" gap="1.5">
-            <SongStatusBadge status={song.status} />
-            {song.tags.map((t) => (
-              <Badge key={t}>#{t}</Badge>
-            ))}
-            <SongLinks youtubeUrl={song.youtubeUrl} chordUrl={song.chordUrl} />
-          </Wrap>
-          <HStack as="dl" gap="6" fontFamily="mono">
-            <Stat label="KEY" value={song.key ?? '–'} accent />
-            <Stat label="BPM" value={song.bpm?.toString() ?? '–'} />
-            <Stat label="TIME" value={formatClock(song.durationSec)} />
-          </HStack>
-          {song.notes && (
-            <Text borderLeftWidth="2px" borderColor="brand.solid" pl="3" fontSize="sm">
-              {song.notes}
-            </Text>
-          )}
-        </Stack>
-      </Flex>
+  const viewer = useChordViewer(song.chordUrl, song.content)
+  const [chordsHidden, setChordsHidden] = useStoredFlag(CHORDS_HIDDEN_KEY)
+  useChordShortcuts(viewer, !chordsHidden)
+  const [sections, setSection] = useOpenSections()
 
-      {/* 65 / 35 split once there's room: chords | stems, chords in key, notes */}
-      <Grid
-        alignItems="start"
-        gap="6"
-        css={{ [WIDE]: { gridTemplateColumns: 'minmax(0,65fr) minmax(0,35fr)' } }}
-      >
-        <ChordPane key={song.id} chordUrl={song.chordUrl} content={song.content} />
-        <Stack
-          as="aside"
-          gap="6"
-          css={{
-            [WIDE]: {
-              position: 'sticky',
-              top: '1.5rem',
-              maxHeight: 'calc(100vh - 6rem)',
-              overflowY: 'auto'
-            }
-          }}
+  function toggleChords(): void {
+    viewer.setPlaying(false)
+    setChordsHidden(!chordsHidden)
+  }
+
+  // Details and practice tools: in the inspector beside the chords, or in Main when the
+  // chords are hidden
+  const tools = (
+    <>
+      <KeyValueList>
+        <KeyValue label="Key">
+          <Text as="span" fontFamily="mono" color="accent.fg">
+            {song.key ?? '–'}
+          </Text>
+        </KeyValue>
+        <KeyValue label="BPM" numeric>
+          {song.bpm ?? '–'}
+        </KeyValue>
+        <KeyValue label="ความยาว" numeric>
+          {formatClock(song.durationSec)}
+        </KeyValue>
+        <KeyValue label="สถานะ">
+          <SongStatusBadge status={song.status} />
+        </KeyValue>
+        <KeyValue label="ศิลปิน">
+          <Text as="span" display="block" truncate>
+            {song.artist || '—'}
+          </Text>
+        </KeyValue>
+        {song.tags.length > 0 && (
+          <KeyValue label="แท็ก">
+            <Wrap justify="flex-end" gap="1" py="2">
+              {song.tags.map((t) => (
+                <Badge key={t}>#{t}</Badge>
+              ))}
+            </Wrap>
+          </KeyValue>
+        )}
+      </KeyValueList>
+
+      {song.notes && (
+        <Text fontSize="sm" whiteSpace="pre-wrap">
+          {song.notes}
+        </Text>
+      )}
+
+      <Stack gap="0" borderBottomWidth="1px">
+        <FoldSection
+          title="YouTube"
+          icon={<CirclePlay />}
+          open={sections.youtube}
+          onOpenChange={(o) => setSection('youtube', o)}
         >
-          <Stack gap="2">
-            <StemsPanel key={song.id} song={song} />
-            <KeyChords musicalKey={song.key} compact />
-          </Stack>
-          <InstrumentNotes song={song} members={members} onChange={onChange} />
-        </Stack>
-      </Grid>
+          <YouTubePlayer url={song.youtubeUrl} title={song.title} />
+        </FoldSection>
+        <FoldSection
+          title="Stems"
+          icon={<AudioLines />}
+          open={sections.stems}
+          onOpenChange={(o) => setSection('stems', o)}
+        >
+          <StemsPanel song={song} bare />
+        </FoldSection>
+        <FoldSection
+          title="คอร์ดในคีย์"
+          icon={<Music />}
+          open={sections.keyChords}
+          onOpenChange={(o) => setSection('keyChords', o)}
+        >
+          <KeyChords musicalKey={song.key} compact />
+        </FoldSection>
+        <FoldSection
+          title="โน้ตรายเครื่องดนตรี"
+          icon={<NotebookPen />}
+          open={sections.notes}
+          onOpenChange={(o) => setSection('notes', o)}
+        >
+          <InstrumentNotes song={song} members={members} onChange={onChange} bare />
+        </FoldSection>
+      </Stack>
+    </>
+  )
+
+  return (
+    <>
+      <ShellMain>
+        <PanelHeader
+          title={song.title}
+          titleStyle="title.page"
+          actions={
+            <>
+              <PanelAction
+                label={chordsHidden ? 'แสดงคอร์ด' : 'ซ่อนคอร์ด'}
+                aria-pressed={chordsHidden}
+                onClick={toggleChords}
+              >
+                {chordsHidden ? <Eye /> : <EyeOff />}
+              </PanelAction>
+              <PanelAction label="แก้ไขเพลง" onClick={onEdit}>
+                <Pencil />
+              </PanelAction>
+              <SongMenu song={song} onDelete={onDelete} />
+              {!chordsHidden && <InspectorToggle />}
+            </>
+          }
+        />
+
+        {/* Meta bar: what you need before the first chord */}
+        <Flex
+          h="panel.footerH"
+          flexShrink={0}
+          align="center"
+          gap="3"
+          px="panel.px"
+          borderBottomWidth="1px"
+        >
+          <HStack
+            as="p"
+            minW="0"
+            flex="1"
+            gap="2"
+            overflow="hidden"
+            fontSize="sm"
+            color="fg.muted"
+            whiteSpace="nowrap"
+          >
+            <span>
+              Key{' '}
+              <Text as="b" fontFamily="mono" color="accent.fg">
+                {song.key ?? '–'}
+              </Text>
+            </span>
+            <span aria-hidden>·</span>
+            <span>
+              <Text as="b" fontFamily="mono" color="fg.default" fontVariantNumeric="tabular-nums">
+                {song.bpm ?? '–'}
+              </Text>{' '}
+              BPM
+            </span>
+            <span aria-hidden>·</span>
+            <Text as="b" fontFamily="mono" color="fg.default" fontVariantNumeric="tabular-nums">
+              {formatClock(song.durationSec)}
+            </Text>
+          </HStack>
+          {!chordsHidden && (
+            <>
+              <ChordWebNav viewer={viewer} />
+              <ChordSourceSwitch viewer={viewer} />
+            </>
+          )}
+        </Flex>
+
+        {chordsHidden ? (
+          <>
+            <PracticeBoard song={song} members={members} onChange={onChange} />
+            <PanelFooter>
+              <SongLinks youtubeUrl={song.youtubeUrl} chordUrl={song.chordUrl} />
+            </PanelFooter>
+          </>
+        ) : (
+          <>
+            <ChordView viewer={viewer} />
+            <PanelFooter>
+              {viewer.empty ? 'ยังไม่มีคอร์ดให้เลื่อน' : <ChordControls viewer={viewer} />}
+            </PanelFooter>
+          </>
+        )}
+      </ShellMain>
+
+      {!chordsHidden && (
+        <ShellInspector label={`รายละเอียด: ${song.title}`} title="รายละเอียด">
+          <PanelBody>{tools}</PanelBody>
+          <PanelFooter>
+            <SongLinks youtubeUrl={song.youtubeUrl} chordUrl={song.chordUrl} />
+          </PanelFooter>
+        </ShellInspector>
+      )}
+    </>
+  )
+}
+
+/** Main gets this two-column layout once its width passes 48rem (container query). */
+const WIDE = '@container (min-width: 48rem)'
+
+/** One block of the practice board: a card with an optional label. */
+function Board({
+  label,
+  icon,
+  children
+}: {
+  label?: string
+  icon?: React.ReactNode
+  children: React.ReactNode
+}): React.JSX.Element {
+  return (
+    <Stack as="section" gap="3" rounded="card" borderWidth="1px" bg="bg.panel" p="panel.px">
+      {label && (
+        <SectionLabel display="flex" alignItems="center" gap="2" _icon={{ boxSize: '4' }}>
+          {icon}
+          {label}
+        </SectionLabel>
+      )}
+      {children}
     </Stack>
   )
 }
 
-function Stat({
-  label,
-  value,
-  accent
+/**
+ * Song page with the chords hidden: Main has the room, so the tools sit side by side instead
+ * of folded. Left: listen (video, stems). Right: read (details, chords in key, parts).
+ * Key · BPM · length stay in the meta bar above, so they aren't repeated here.
+ */
+function PracticeBoard({
+  song,
+  members,
+  onChange
 }: {
-  label: string
-  value: string
-  accent?: boolean
+  song: Song
+  members: Member[]
+  onChange: (song: Song) => void
 }): React.JSX.Element {
   return (
-    <Stack gap="1">
-      <Text as="dt" fontSize="11px" letterSpacing="widest" color="fg.muted">
-        {label}
-      </Text>
-      <Text as="dd" fontSize="2xl" fontWeight="bold" color={accent ? 'brand.fg' : undefined}>
-        {value}
-      </Text>
-    </Stack>
+    <PanelBody containerType="inline-size">
+      <Grid
+        maxW="page.default"
+        w="full"
+        gap="panel.gap"
+        alignItems="start"
+        templateColumns="minmax(0, 1fr)"
+        css={{ [WIDE]: { gridTemplateColumns: 'minmax(0, 3fr) minmax(0, 2fr)' } }}
+      >
+        <Stack gap="panel.gap" minW="0">
+          <Board label="YouTube" icon={<CirclePlay />}>
+            <YouTubePlayer url={song.youtubeUrl} title={song.title} />
+          </Board>
+          <Board>
+            <StemsPanel song={song} />
+          </Board>
+        </Stack>
+
+        <Stack gap="panel.gap" minW="0">
+          <Board label="รายละเอียด" icon={<Info />}>
+            <KeyValueList>
+              <KeyValue label="สถานะ">
+                <SongStatusBadge status={song.status} />
+              </KeyValue>
+              <KeyValue label="ศิลปิน">
+                <Text as="span" display="block" truncate>
+                  {song.artist || '—'}
+                </Text>
+              </KeyValue>
+              {song.tags.length > 0 && (
+                <KeyValue label="แท็ก">
+                  <Wrap justify="flex-end" gap="1" py="2">
+                    {song.tags.map((t) => (
+                      <Badge key={t}>#{t}</Badge>
+                    ))}
+                  </Wrap>
+                </KeyValue>
+              )}
+            </KeyValueList>
+            {song.notes && (
+              <Text fontSize="sm" whiteSpace="pre-wrap">
+                {song.notes}
+              </Text>
+            )}
+          </Board>
+          <KeyChords musicalKey={song.key} />
+          <Board>
+            <InstrumentNotes song={song} members={members} onChange={onChange} />
+          </Board>
+        </Stack>
+      </Grid>
+    </PanelBody>
+  )
+}
+
+/** ⋯ menu in the song header: less frequent actions, delete last. */
+function SongMenu({ song, onDelete }: { song: Song; onDelete: () => void }): React.JSX.Element {
+  // setWindowOpenHandler in main sends these to the system browser
+  function open(url: string): void {
+    window.open(url, '_blank', 'noopener')
+  }
+  return (
+    <Menu.Root positioning={{ placement: 'bottom-end' }}>
+      <Menu.Trigger asChild>
+        <PanelAction label="เพิ่มเติม">
+          <MoreHorizontal />
+        </PanelAction>
+      </Menu.Trigger>
+      <Portal>
+        <Menu.Positioner>
+          <Menu.Content minW="56">
+            {song.chordUrl && (
+              <Menu.Item value="chords" onClick={() => open(song.chordUrl)}>
+                <ExternalLink size={16} /> เปิดเว็บคอร์ดในเบราว์เซอร์
+              </Menu.Item>
+            )}
+            {song.youtubeUrl && (
+              <Menu.Item value="youtube" onClick={() => open(song.youtubeUrl)}>
+                <CirclePlay size={16} /> เปิด YouTube ในเบราว์เซอร์
+              </Menu.Item>
+            )}
+            {(song.chordUrl || song.youtubeUrl) && <Menu.Separator />}
+            <Menu.Item
+              value="delete"
+              color="fg.error"
+              _highlighted={{ bg: 'danger.subtle', color: 'fg.error' }}
+              onClick={onDelete}
+            >
+              <Trash2 size={16} /> ลบเพลง
+            </Menu.Item>
+          </Menu.Content>
+        </Menu.Positioner>
+      </Portal>
+    </Menu.Root>
   )
 }

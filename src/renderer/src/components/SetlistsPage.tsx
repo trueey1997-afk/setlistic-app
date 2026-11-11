@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Box,
   Button,
@@ -8,9 +8,7 @@ import {
   Collapsible,
   Flex,
   Grid,
-  Heading,
   HStack,
-  IconButton,
   Input,
   Link,
   NativeSelect,
@@ -34,6 +32,7 @@ import {
   Pencil,
   Play,
   Plus,
+  Rows4,
   Send,
   Share2,
   StickyNote,
@@ -60,12 +59,47 @@ import {
 } from '@shared/lineSummary'
 import { buildYouTubePlaylist, YOUTUBE_PLAYLIST_LIMIT } from '@shared/youtube'
 import { useAsync } from '@renderer/hooks/useAsync'
-import { ItemDialog, SetlistItems } from './SetlistItems'
+import { ItemDialog, ProgressChips, SetlistItems } from './SetlistItems'
 import { StageMode } from './StageMode'
 import { YouTubePlayer } from './SongMedia'
 import { SongStatusBadge } from './links'
+import {
+  InspectorToggle,
+  RailItem,
+  Shell,
+  ShellInspector,
+  ShellMain,
+  ShellRail,
+  ShellSidebar,
+  SidebarCollapse,
+  useShell
+} from './shell'
 import { useRun, useToast } from './toast'
-import { Badge, Dialog, EmptyState, Field, ListRow, SearchGroup, SidePane } from './ui'
+import {
+  Badge,
+  Dialog,
+  EmptyState,
+  Field,
+  ListRow,
+  PanelAction,
+  PanelBody,
+  PanelFooter,
+  PanelHeader,
+  PanelToolbar,
+  Placeholder,
+  SearchGroup,
+  SectionLabel
+} from './ui'
+
+const DENSITY_KEY = 'setlistic-setlist-density'
+
+function readCompact(): boolean {
+  try {
+    return localStorage.getItem(DENSITY_KEY) === 'compact'
+  } catch {
+    return false
+  }
+}
 
 const SUMMARY_FORMATS: { value: SummaryFormat; label: string }[] = [
   { value: 'full', label: 'LINE (ละเอียด)' },
@@ -90,23 +124,12 @@ function groupSetlists(list: SetlistSummary[]): { label: string; items: SetlistS
   ].filter((g) => g.items.length > 0)
 }
 
-/** Tiny uppercase caption used on tiles and panel headings. */
-const CAPTION = {
-  fontSize: '10px',
-  fontWeight: 'bold',
-  letterSpacing: 'widest',
-  textTransform: 'uppercase',
-  color: 'fg.muted'
-} as const
-
 export function SetlistsPage({
   bandId,
-  bandName,
-  sidebarOpen
+  bandName
 }: {
   bandId: number
   bandName: string
-  sidebarOpen: boolean
 }): React.JSX.Element {
   const setlists = useAsync(() => window.setlistic.setlists.list(bandId), `setlists:${bandId}`)
   const [selectedId, setSelectedId] = useState<number | null>(null)
@@ -117,17 +140,41 @@ export function SetlistsPage({
   const activeId = selectedId ?? groups[0]?.items[0]?.id ?? null
 
   return (
-    <Flex minH="0" flex="1">
-      <SidePane open={sidebarOpen} label="รายการเซ็ตลิสต์" w="340px">
-        <Box borderBottomWidth="1px" p="3">
-          <Button colorPalette="brand" w="full" onClick={() => setCreating(true)}>
-            <Plus /> สร้างเซ็ตลิสต์
-          </Button>
-        </Box>
-        <Box minH="0" flex="1" overflowY="auto">
+    <Shell>
+      <ShellSidebar
+        label="รายการเซ็ตลิสต์"
+        rail={
+          <ShellRail>
+            {groups.flatMap((g) =>
+              g.items.map((s) => (
+                <RailItem
+                  key={s.id}
+                  label={s.name}
+                  selected={s.id === activeId}
+                  onClick={() => setSelectedId(s.id)}
+                >
+                  <RailDate setlist={s} />
+                </RailItem>
+              ))
+            )}
+          </ShellRail>
+        }
+      >
+        <PanelHeader
+          title="เซ็ตลิสต์"
+          actions={
+            <>
+              <PanelAction label="สร้างเซ็ตลิสต์" onClick={() => setCreating(true)}>
+                <Plus />
+              </PanelAction>
+              <SidebarCollapse />
+            </>
+          }
+        />
+        <PanelBody inset={false} gap="0">
           {setlists.data?.length === 0 && (
-            <Text p="6" textAlign="center" fontSize="sm" color="fg.muted">
-              ยังไม่มีเซ็ตลิสต์ สร้างสำหรับวันซ้อมหรือวันเล่นได้เลย
+            <Text px="panel.px" py="6" fontSize="sm" color="fg.muted">
+              ยังไม่มีเซ็ตลิสต์ กด + เพื่อสร้างสำหรับวันซ้อมหรือวันเล่น
             </Text>
           )}
           {groups.map((g) => (
@@ -137,13 +184,12 @@ export function SetlistsPage({
                 position="sticky"
                 top="0"
                 zIndex="1"
-                bg="bg/95"
+                bg="bg.canvas/95"
                 backdropFilter="blur(8px)"
-                px="3"
+                px="panel.px"
                 pt="3"
                 pb="1"
-                {...CAPTION}
-                fontSize="11px"
+                textStyle="caption"
               >
                 {g.label} · {g.items.length}
               </Text>
@@ -160,26 +206,27 @@ export function SetlistsPage({
               </ul>
             </section>
           ))}
-        </Box>
-      </SidePane>
+        </PanelBody>
+        {setlists.data && <PanelFooter>{setlists.data.length} เซ็ต</PanelFooter>}
+      </ShellSidebar>
 
-      <Flex as="section" minW="0" flex="1">
-        {activeId ? (
-          <SetlistView
-            key={activeId}
-            setlistId={activeId}
-            bandId={bandId}
-            bandName={bandName}
-            onChanged={setlists.reload}
-            onDeleted={() => {
-              setSelectedId(null)
-              setlists.reload()
-            }}
-          />
-        ) : (
-          <EmptyState icon={<ListMusic />} title="เลือกเซ็ตลิสต์ หรือสร้างใหม่" />
-        )}
-      </Flex>
+      {activeId ? (
+        <SetlistView
+          key={activeId}
+          setlistId={activeId}
+          bandId={bandId}
+          bandName={bandName}
+          onChanged={setlists.reload}
+          onDeleted={() => {
+            setSelectedId(null)
+            setlists.reload()
+          }}
+        />
+      ) : (
+        <ShellMain>
+          <EmptyState icon={<ListMusic />} title="เลือกเซ็ตลิสต์ หรือกด + เพื่อสร้างใหม่" />
+        </ShellMain>
+      )}
 
       <SetlistFormDialog
         open={creating}
@@ -192,7 +239,28 @@ export function SetlistsPage({
           setlists.reload()
         }}
       />
-    </Flex>
+    </Shell>
+  )
+}
+
+/** The day of the month in a small tile; gigs tinted like in the full list. */
+function RailDate({ setlist: s }: { setlist: SetlistSummary }): React.JSX.Element {
+  return (
+    <Stack
+      boxSize="8"
+      align="center"
+      justify="center"
+      rounded="chip"
+      borderWidth="1px"
+      fontFamily="mono"
+      fontSize="xs"
+      fontWeight="bold"
+      {...(s.kind === 'gig'
+        ? { borderColor: 'accent.muted', bg: 'accent.subtle', color: 'accent.fg' }
+        : { bg: 'bg.panel' })}
+    >
+      {s.eventDate ? Number(s.eventDate.slice(8, 10)) : '–'}
+    </Stack>
   )
 }
 
@@ -211,35 +279,33 @@ function SetlistRow({
     <ListRow selected={selected} onClick={onClick}>
       <Stack
         w="12"
+        h="9"
         flexShrink={0}
         align="center"
+        justify="center"
         gap="0"
-        rounded="sm"
+        rounded="chip"
         borderWidth="1px"
-        py="1"
-        lineHeight="short"
         {...(s.kind === 'gig'
-          ? { borderColor: 'brand.solid', bg: 'brand.solid', color: 'brand.contrast' }
-          : { bg: 'bg' })}
+          ? { borderColor: 'accent.muted', bg: 'accent.subtle', color: 'accent.fg' }
+          : { bg: 'bg.panel' })}
       >
         {date ? (
           <>
-            <Text fontFamily="mono" fontSize="lg" fontWeight="bold">
+            <Text fontFamily="mono" fontSize="sm" lineHeight="1.25rem" fontWeight="bold">
               {date.getDate()}
             </Text>
-            <Text fontSize="10px" fontWeight="semibold" opacity={0.8}>
+            <Text fontSize="xs" lineHeight="1rem">
               {date.toLocaleDateString('th-TH', { month: 'short' })}
             </Text>
           </>
         ) : (
-          <Text py="2" fontSize="xs">
-            –
-          </Text>
+          <Text fontSize="xs">–</Text>
         )}
       </Stack>
       <Box minW="0" flex="1">
-        <HStack gap="1.5">
-          <Text truncate fontSize="sm" fontWeight="semibold">
+        <HStack gap="2">
+          <Text truncate textStyle="title.item">
             {s.name}
           </Text>
           {isToday && <Badge tone="primary">วันนี้</Badge>}
@@ -250,7 +316,14 @@ function SetlistRow({
           {s.venue && ` · ${s.venue}`}
         </Text>
       </Box>
-      <Box flexShrink={0} textAlign="right" fontFamily="mono" fontSize="xs" color="fg.muted">
+      <Box
+        flexShrink={0}
+        textAlign="right"
+        fontFamily="mono"
+        fontSize="xs"
+        color="fg.muted"
+        fontVariantNumeric="tabular-nums"
+      >
         <Text>{s.songCount} เพลง</Text>
         {s.totalSec > 0 && <Text>{formatTotal(s.totalSec)}</Text>}
       </Box>
@@ -258,6 +331,7 @@ function SetlistRow({
   )
 }
 
+/** Main panel (the setlist) and inspector (the picked song) for one setlist. */
 function SetlistView({
   setlistId,
   bandId,
@@ -273,23 +347,34 @@ function SetlistView({
 }): React.JSX.Element {
   const run = useRun()
   const toast = useToast()
+  const shell = useShell()
   const setlist = useAsync(() => window.setlistic.setlists.get(setlistId), `setlist:${setlistId}`)
   const [editing, setEditing] = useState(false)
   const [adding, setAdding] = useState(false)
   const [includeProgress, setIncludeProgress] = useState(false)
   const [format, setFormat] = useState<SummaryFormat>('full')
   const [sharing, setSharing] = useState(false)
+  const [compact, setCompact] = useState(readCompact)
   const [query, setQuery] = useState('')
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null)
   const [editingItem, setEditingItem] = useState<SetlistItem | null>(null)
   // Item to open stage mode on; null picks up at the first unplayed song
   const [stage, setStage] = useState<{ startItemId: number | null } | null>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
+  const { searchTick } = shell
+
+  // Ctrl+K (shell) focuses this search
+  useEffect(() => {
+    if (searchTick) searchRef.current?.focus()
+  }, [searchTick])
 
   if (!setlist.data)
     return (
-      <Text p="6" color="fg.error">
-        {setlist.error}
-      </Text>
+      <ShellMain>
+        <Text p="panel.px" color="fg.error">
+          {setlist.error}
+        </Text>
+      </ShellMain>
     )
   const s = setlist.data
   const selectedItem = s.items.find((it) => it.id === selectedItemId) ?? s.items[0]
@@ -316,11 +401,21 @@ function SetlistView({
     )
   }
 
+  function toggleCompact(): void {
+    try {
+      localStorage.setItem(DENSITY_KEY, compact ? 'comfortable' : 'compact')
+    } catch {
+      // Still applies for this session
+    }
+    setCompact(!compact)
+  }
+
   const text = generateLineSummary(s, { bandName, includeProgress, format })
   const tooLong = format === 'short' && text.length > SHORT_SUMMARY_LIMIT
   const playlist = buildYouTubePlaylist(s.items.map((it) => it.song))
   const readyCount = s.items.filter(isItemReady).length
   const playedCount = s.items.filter((it) => it.played).length
+  const hasMembers = s.items.length > 0 && s.items[0].progress.length > 0
 
   function setPlayed(item: SetlistItem, played: boolean): void {
     // optimistic, so ticking through a live set feels instant
@@ -338,117 +433,104 @@ function SetlistView({
   const numbers = new Map(s.items.map((it, i) => [it.id, i + 1]))
 
   return (
-    <Flex minH="0" minW="0" flex="1">
-      {/* ── Workspace ── */}
-      <Box minW="0" flex="1" overflowY="auto">
-        <Stack mx="auto" maxW="5xl" gap="4" p="6">
-          <Flex as="header" wrap="wrap" align="flex-start" justify="space-between" gap="4">
-            <Stack minW="0" gap="1.5">
-              <HStack gap="2">
-                <Badge tone={s.kind === 'gig' ? 'primary' : 'neutral'}>
-                  {SETLIST_KIND_LABEL[s.kind]}
-                </Badge>
-                <Wrap columnGap="4" rowGap="1" fontSize="sm" color="fg.muted">
-                  {s.eventDate && (
-                    <HStack as="span" gap="1">
-                      <CalendarDays size={16} /> {formatThaiDate(s.eventDate, s.eventTime)}
-                    </HStack>
-                  )}
-                  <Venue venue={s.venue} venueUrl={s.venueUrl} />
-                </Wrap>
-              </HStack>
-              <Heading size="3xl" wordBreak="break-word">
-                {s.name}
-              </Heading>
-              {s.notes && (
-                <Text fontSize="sm" color="fg.muted">
-                  {s.notes}
-                </Text>
-              )}
-            </Stack>
-            <HStack flexShrink={0} gap="1">
-              <Button
-                colorPalette="brand"
-                disabled={s.items.length === 0}
-                onClick={() => setStage({ startItemId: null })}
-                title="เต็มจอ ตัวใหญ่ เปลี่ยนเพลงด้วยลูกศรหรือ pedal"
-              >
-                <Play /> เล่นสด
-              </Button>
-              <Button
-                variant={sharing ? 'subtle' : 'outline'}
-                aria-expanded={sharing}
+    <>
+      <ShellMain>
+        <PanelHeader
+          title={s.name}
+          titleStyle="title.page"
+          actions={
+            <>
+              <PanelAction label="แก้ไขเซ็ตลิสต์" onClick={() => setEditing(true)}>
+                <Pencil />
+              </PanelAction>
+              <PanelAction
+                label="แชร์ (LINE, YouTube playlist)"
+                aria-pressed={sharing}
+                variant={sharing ? 'subtle' : 'ghost'}
                 onClick={() => setSharing(!sharing)}
               >
-                <Share2 /> แชร์
-              </Button>
-              <IconButton
-                variant="ghost"
-                color="fg.muted"
-                onClick={() => setEditing(true)}
-                aria-label="แก้ไขเซ็ตลิสต์"
-              >
-                <Pencil />
-              </IconButton>
-              <IconButton
-                variant="ghost"
-                colorPalette="red"
-                aria-label="ลบเซ็ตลิสต์"
+                <Share2 />
+              </PanelAction>
+              <PanelAction
+                label="ลบเซ็ตลิสต์"
+                colorPalette="danger"
                 onClick={async () => {
                   if (!confirm(`ลบเซ็ตลิสต์ "${s.name}"?`)) return
                   if ((await run(window.setlistic.setlists.remove(s.id))) !== undefined) onDeleted()
                 }}
               >
                 <Trash2 />
-              </IconButton>
-            </HStack>
-          </Flex>
-
-          {/* ── Summary ── */}
-          <Grid as="dl" templateColumns={{ base: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' }} gap="2">
-            <SummaryTile label="เพลงทั้งหมด" value={String(s.items.length)} />
-            <SummaryTile
-              label="ความยาวรวม"
-              value={`~${formatTotal(s.totalSec)}`}
-              hint={
-                s.unknownDurationCount > 0
-                  ? `+${s.unknownDurationCount} เพลงไม่ระบุความยาว`
-                  : undefined
-              }
-            />
-            {s.items.length > 0 && s.items[0].progress.length > 0 ? (
-              <SummaryTile
-                label="ทั้งวงพร้อม"
-                value={`${readyCount}/${s.items.length}`}
-                meter={readyCount / s.items.length}
-                tone="success"
-              />
-            ) : (
-              <SummaryTile label="ทั้งวงพร้อม" value="–" hint="ยังไม่มีสมาชิก" />
-            )}
-            <SummaryTile
-              label="เล่นแล้ว"
-              value={`${playedCount}/${s.items.length}`}
-              meter={s.items.length ? playedCount / s.items.length : 0}
-            />
-          </Grid>
-
-          {/* ── Share tools ── */}
-          {sharing && (
-            <Wrap align="center" gap="2" rounded="xl" borderWidth="1px" bg="bg.panel" p="3">
-              <SegmentGroup.Root
-                size="sm"
-                value={format}
-                onValueChange={(e) => setFormat(e.value as SummaryFormat)}
-                aria-label="รูปแบบข้อความ"
-              >
-                <SegmentGroup.Indicator />
-                <SegmentGroup.Items items={SUMMARY_FORMATS} fontWeight="semibold" />
-              </SegmentGroup.Root>
+              </PanelAction>
               <Button
-                variant="outline"
+                colorPalette="accent"
+                ml="2"
                 disabled={s.items.length === 0}
-                onClick={async () => {
+                onClick={() => setStage({ startItemId: null })}
+                title="เต็มจอ ตัวใหญ่ เปลี่ยนเพลงด้วยลูกศรหรือ pedal"
+              >
+                <Play /> เล่นสด
+              </Button>
+              <InspectorToggle />
+            </>
+          }
+        />
+
+        <PanelToolbar>
+          <Wrap align="center" columnGap="4" rowGap="1" fontSize="sm" color="fg.muted">
+            <Badge tone={s.kind === 'gig' ? 'primary' : 'neutral'}>
+              {SETLIST_KIND_LABEL[s.kind]}
+            </Badge>
+            {s.eventDate && (
+              <HStack as="span" gap="1">
+                <CalendarDays size={16} /> {formatThaiDate(s.eventDate, s.eventTime)}
+              </HStack>
+            )}
+            <Venue venue={s.venue} venueUrl={s.venueUrl} />
+          </Wrap>
+          <HStack gap="2" maxW="page.default">
+            <SearchGroup>
+              <Input
+                ref={searchRef}
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="ค้นหาเพลงในเซ็ตนี้  (Ctrl+K)"
+                aria-label="ค้นหาเพลงในเซ็ตนี้"
+              />
+            </SearchGroup>
+            <Button variant="outline" onClick={() => setAdding(true)}>
+              <Plus /> เพิ่มเพลง
+            </Button>
+            <PanelAction
+              label={compact ? 'แถวปกติ' : 'แถวแน่น (เซ็ตยาว)'}
+              aria-pressed={compact}
+              variant={compact ? 'subtle' : 'ghost'}
+              onClick={toggleCompact}
+            >
+              <Rows4 />
+            </PanelAction>
+          </HStack>
+        </PanelToolbar>
+
+        <PanelBody>
+          <Stack maxW="page.default" gap="panel.gap">
+            {s.notes && (
+              <Text fontSize="sm" color="fg.muted">
+                {s.notes}
+              </Text>
+            )}
+
+            {sharing && (
+              <ShareTools
+                setlist={s}
+                text={text}
+                tooLong={tooLong}
+                format={format}
+                onFormat={setFormat}
+                includeProgress={includeProgress}
+                onIncludeProgress={setIncludeProgress}
+                playlist={playlist}
+                onCopy={async () => {
                   if ((await run(window.setlistic.system.copyText(text))) !== undefined)
                     toast(
                       format === 'short'
@@ -456,146 +538,71 @@ function SetlistView({
                         : 'คัดลอกแล้ว ไปวางในกลุ่ม LINE ได้เลย'
                     )
                 }}
-              >
-                <Copy /> คัดลอกข้อความ
-              </Button>
-              <Button
-                variant="outline"
-                disabled={s.items.length === 0 || format === 'short'}
-                title={format === 'short' ? 'ส่งเข้า LINE ใช้แบบละเอียด' : undefined}
-                onClick={() => run(window.setlistic.system.openExternal(lineShareUrl(text)))}
-              >
-                <Send /> ส่งเข้า LINE
-              </Button>
-              <Button
-                variant="outline"
-                disabled={!playlist}
-                title={
-                  playlist
-                    ? `เล่น ${playlist.videoCount} เพลงต่อกันตามลำดับ` +
-                      (playlist.missingCount
-                        ? ` · ข้าม ${playlist.missingCount} เพลงที่ไม่มีลิงก์`
-                        : '') +
-                      (playlist.truncated ? ` · สูงสุด ${YOUTUBE_PLAYLIST_LIMIT} เพลงแรก` : '')
-                    : 'ยังไม่มีเพลงที่มีลิงก์ YouTube'
-                }
-                onClick={() => playlist && run(window.setlistic.system.openExternal(playlist.url))}
-              >
-                <CirclePlay /> YouTube Playlist{playlist && ` (${playlist.videoCount})`}
-              </Button>
-              <Checkbox.Root
-                ml="auto"
-                size="sm"
-                colorPalette="brand"
-                checked={includeProgress}
-                onCheckedChange={(e) => setIncludeProgress(e.checked === true)}
-              >
-                <Checkbox.HiddenInput />
-                <Checkbox.Control />
-                <Checkbox.Label color="fg.muted" fontWeight="normal">
-                  แนบสถานะการซ้อม
-                </Checkbox.Label>
-              </Checkbox.Root>
-              <Collapsible.Root w="full" fontSize="sm">
-                <Collapsible.Trigger
-                  cursor="pointer"
-                  color="fg.muted"
-                  _hover={{ color: 'fg' }}
-                  textAlign="left"
-                >
-                  ดูตัวอย่างข้อความ{' '}
-                  <Span fontFamily="mono" fontSize="xs" color={tooLong ? 'fg.error' : undefined}>
-                    ({text.length.toLocaleString()}
-                    {format === 'short' && `/${SHORT_SUMMARY_LIMIT.toLocaleString()}`} ตัวอักษร)
-                  </Span>
-                </Collapsible.Trigger>
-                <Collapsible.Content>
-                  {tooLong && (
-                    <Text mt="2" fontSize="xs" color="fg.error">
-                      ยาวเกินที่ IG ส่งได้ในข้อความเดียว ลองย่อชื่อเซ็ต/สถานที่
-                      หรือแบ่งเซ็ตเป็นสองช่วง
-                    </Text>
-                  )}
-                  <Box
-                    as="pre"
-                    mt="2"
-                    maxH="72"
-                    overflow="auto"
-                    rounded="lg"
-                    bg="bg.muted"
-                    p="3"
-                    fontFamily="body"
-                    fontSize="xs"
-                    whiteSpace="pre-wrap"
-                  >
-                    {text}
-                  </Box>
-                </Collapsible.Content>
-              </Collapsible.Root>
-            </Wrap>
-          )}
-
-          {/* ── Songs ── */}
-          <Stack as="section" gap="3" aria-label="รายการเพลง">
-            <HStack gap="2">
-              <SearchGroup>
-                <Input
-                  type="search"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="ค้นหาเพลงในเซ็ตนี้…"
-                  bg="bg.panel"
-                  aria-label="ค้นหาเพลงในเซ็ตนี้"
-                />
-              </SearchGroup>
-              <Button variant="outline" onClick={() => setAdding(true)}>
-                <Plus /> เพิ่มเพลง
-              </Button>
-            </HStack>
+                onOpen={(url) => run(window.setlistic.system.openExternal(url))}
+              />
+            )}
 
             {s.items.length === 0 ? (
-              <Box
-                rounded="xl"
-                borderWidth="1px"
-                borderStyle="dashed"
-                p="10"
-                textAlign="center"
-                fontSize="sm"
-                color="fg.muted"
-              >
+              <Placeholder py="12">
                 ยังไม่มีเพลงในเซ็ตนี้ กด &quot;เพิ่มเพลง&quot; เพื่อเลือกจากคลังเพลงของวง
-              </Box>
+              </Placeholder>
             ) : shownItems.length === 0 ? (
-              <Text py="8" textAlign="center" fontSize="sm" color="fg.muted">
-                ไม่มีเพลงที่ตรงกับ &quot;{query}&quot;
-              </Text>
+              <Placeholder>ไม่มีเพลงที่ตรงกับ &quot;{query}&quot;</Placeholder>
             ) : (
-              <>
+              <Stack as="section" gap="2" aria-label="รายการเพลง">
                 <SetlistItems
                   items={shownItems}
                   numberOf={(item) => numbers.get(item.id) ?? 0}
                   selectedId={selectedItem?.id ?? null}
                   reorderable={!q}
-                  onSelect={(item) => setSelectedItemId(item.id)}
+                  compact={compact}
+                  onSelect={(item) => {
+                    setSelectedItemId(item.id)
+                    shell.showInspector()
+                  }}
                   onReorder={reorder}
                   onRemove={(item) => apply(window.setlistic.setlists.removeItem(item.id), true)}
-                  onEdit={updateItem}
-                  onProgress={(item, memberId, status) =>
-                    apply(window.setlistic.setlists.setProgress(item.id, memberId, status))
-                  }
+                  onEdit={setEditingItem}
                   onPlayed={setPlayed}
                 />
                 <Text fontSize="xs" color="fg.muted">
-                  คลิกแถวเพื่อดูรายละเอียด · ลากที่ ⋮⋮ เพื่อจัดลำดับ (หรือโฟกัสแล้วกดลูกศร) ·
-                  ติ๊กช่องหน้าเลขลำดับเมื่อเล่นแล้ว · คลิกชื่อสมาชิกเพื่อเปลี่ยนสถานะการซ้อม
+                  ลากที่ ⋮⋮ เพื่อจัดลำดับ (หรือโฟกัสแล้วกดลูกศร) · ติ๊กช่องหน้าเลขลำดับเมื่อเล่นแล้ว
+                  · สถานะการซ้อมของสมาชิกอยู่ในแผงรายละเอียด
                 </Text>
-              </>
+              </Stack>
             )}
           </Stack>
-        </Stack>
-      </Box>
+        </PanelBody>
 
-      {/* ── Inspector ── */}
+        <PanelFooter>
+          <Meter
+            label="เล่นแล้ว"
+            value={playedCount}
+            total={s.items.length}
+            colorPalette="accent"
+          />
+          {hasMembers && (
+            <Meter
+              label="ทั้งวงพร้อม"
+              value={readyCount}
+              total={s.items.length}
+              colorPalette="success"
+            />
+          )}
+          <Text
+            ml="auto"
+            title={
+              s.unknownDurationCount > 0
+                ? `+${s.unknownDurationCount} เพลงไม่ระบุความยาว`
+                : undefined
+            }
+          >
+            {s.items.length} เพลง · ~{formatTotal(s.totalSec)}
+            {s.unknownDurationCount > 0 && ` (+${s.unknownDurationCount})`}
+          </Text>
+        </PanelFooter>
+      </ShellMain>
+
       {selectedItem && (
         <SongInspector
           key={selectedItem.id}
@@ -605,6 +612,9 @@ function SetlistView({
           onEdit={() => setEditingItem(selectedItem)}
           onOpenYouTube={() =>
             run(window.setlistic.system.openExternal(selectedItem.song.youtubeUrl))
+          }
+          onProgress={(memberId, status) =>
+            apply(window.setlistic.setlists.setProgress(selectedItem.id, memberId, status))
           }
         />
       )}
@@ -637,7 +647,165 @@ function SetlistView({
           setEditing(false)
         }}
       />
-    </Flex>
+    </>
+  )
+}
+
+/** Small "label n/total ▓▓░" for the panel footer. */
+function Meter({
+  label,
+  value,
+  total,
+  colorPalette
+}: {
+  label: string
+  value: number
+  total: number
+  colorPalette: 'accent' | 'success'
+}): React.JSX.Element {
+  return (
+    <HStack gap="2">
+      <Text>
+        {label} {value}/{total}
+      </Text>
+      <Progress.Root
+        w="16"
+        value={total ? (value / total) * 100 : 0}
+        size="xs"
+        colorPalette={colorPalette}
+        aria-label={label}
+      >
+        <Progress.Track rounded="full" bg="bg.muted">
+          <Progress.Range rounded="full" />
+        </Progress.Track>
+      </Progress.Root>
+    </HStack>
+  )
+}
+
+/** LINE text, copy/send and YouTube playlist; shown under the header while sharing is on. */
+function ShareTools({
+  setlist: s,
+  text,
+  tooLong,
+  format,
+  onFormat,
+  includeProgress,
+  onIncludeProgress,
+  playlist,
+  onCopy,
+  onOpen
+}: {
+  setlist: SetlistDetail
+  text: string
+  tooLong: boolean
+  format: SummaryFormat
+  onFormat: (format: SummaryFormat) => void
+  includeProgress: boolean
+  onIncludeProgress: (on: boolean) => void
+  playlist: ReturnType<typeof buildYouTubePlaylist>
+  onCopy: () => void
+  onOpen: (url: string) => void
+}): React.JSX.Element {
+  return (
+    <Wrap
+      as="section"
+      aria-label="แชร์เซ็ตลิสต์"
+      align="center"
+      gap="2"
+      rounded="card"
+      borderWidth="1px"
+      bg="bg.panel"
+      p="panel.px"
+    >
+      <SegmentGroup.Root
+        size="sm"
+        value={format}
+        onValueChange={(e) => onFormat(e.value as SummaryFormat)}
+        aria-label="รูปแบบข้อความ"
+      >
+        <SegmentGroup.Indicator />
+        <SegmentGroup.Items items={SUMMARY_FORMATS} fontWeight="semibold" />
+      </SegmentGroup.Root>
+      <Button variant="outline" disabled={s.items.length === 0} onClick={onCopy}>
+        <Copy /> คัดลอกข้อความ
+      </Button>
+      <Button
+        variant="outline"
+        disabled={s.items.length === 0 || format === 'short'}
+        title={format === 'short' ? 'ส่งเข้า LINE ใช้แบบละเอียด' : undefined}
+        onClick={() => onOpen(lineShareUrl(text))}
+      >
+        <Send /> ส่งเข้า LINE
+      </Button>
+      <Button
+        variant="outline"
+        disabled={!playlist}
+        title={
+          playlist
+            ? `เล่น ${playlist.videoCount} เพลงต่อกันตามลำดับ` +
+              (playlist.missingCount ? ` · ข้าม ${playlist.missingCount} เพลงที่ไม่มีลิงก์` : '') +
+              (playlist.truncated ? ` · สูงสุด ${YOUTUBE_PLAYLIST_LIMIT} เพลงแรก` : '')
+            : 'ยังไม่มีเพลงที่มีลิงก์ YouTube'
+        }
+        onClick={() => playlist && onOpen(playlist.url)}
+      >
+        <CirclePlay /> YouTube Playlist{playlist && ` (${playlist.videoCount})`}
+      </Button>
+      <Checkbox.Root
+        ml="auto"
+        size="sm"
+        colorPalette="accent"
+        checked={includeProgress}
+        onCheckedChange={(e) => onIncludeProgress(e.checked === true)}
+      >
+        <Checkbox.HiddenInput />
+        <Checkbox.Control />
+        <Checkbox.Label color="fg.muted" fontWeight="normal">
+          แนบสถานะการซ้อม
+        </Checkbox.Label>
+      </Checkbox.Root>
+      <Collapsible.Root w="full" fontSize="sm">
+        <Collapsible.Trigger
+          cursor="pointer"
+          color="fg.muted"
+          _hover={{ color: 'fg.default' }}
+          textAlign="left"
+        >
+          ดูตัวอย่างข้อความ{' '}
+          <Span
+            fontFamily="mono"
+            fontSize="xs"
+            fontVariantNumeric="tabular-nums"
+            color={tooLong ? 'fg.error' : undefined}
+          >
+            ({text.length.toLocaleString()}
+            {format === 'short' && `/${SHORT_SUMMARY_LIMIT.toLocaleString()}`} ตัวอักษร)
+          </Span>
+        </Collapsible.Trigger>
+        <Collapsible.Content>
+          {tooLong && (
+            <Text mt="2" fontSize="xs" color="fg.error">
+              ยาวเกินที่ IG ส่งได้ในข้อความเดียว ลองย่อชื่อเซ็ต/สถานที่ หรือแบ่งเซ็ตเป็นสองช่วง
+            </Text>
+          )}
+          <Box
+            as="pre"
+            mt="2"
+            maxH="72"
+            overflow="auto"
+            rounded="inset"
+            bg="bg.muted"
+            p="3"
+            fontFamily="body"
+            fontSize="xs"
+            whiteSpace="pre-wrap"
+          >
+            {text}
+          </Box>
+        </Collapsible.Content>
+      </Collapsible.Root>
+    </Wrap>
   )
 }
 
@@ -666,77 +834,28 @@ function Venue({ venue, venueUrl }: { venue: string; venueUrl: string }): React.
       textDecoration="underline"
       textDecorationColor="border"
       textUnderlineOffset="4px"
-      _hover={{ color: 'brand.fg', textDecorationColor: 'brand.fg' }}
+      _hover={{ color: 'accent.fg', textDecorationColor: 'accent.fg' }}
     >
-      <MapPin size={16} /> {label} <ExternalLink size={14} />
+      <MapPin size={16} /> {label} <ExternalLink size={16} />
     </Link>
   )
 }
 
-function SummaryTile({
-  label,
-  value,
-  hint,
-  meter,
-  tone = 'primary'
-}: {
-  label: string
-  value: string
-  hint?: string
-  /** 0–1; draws a bar under the value. */
-  meter?: number
-  tone?: 'primary' | 'success'
-}): React.JSX.Element {
-  return (
-    <Stack gap="1" rounded="xl" borderWidth="1px" bg="bg.panel" px="3" py="2.5">
-      <Text as="dt" {...CAPTION}>
-        {label}
-      </Text>
-      <Text
-        as="dd"
-        fontFamily="mono"
-        fontSize="xl"
-        lineHeight="shorter"
-        fontWeight="bold"
-        fontVariantNumeric="tabular-nums"
-      >
-        {value}
-      </Text>
-      {meter !== undefined ? (
-        <Progress.Root
-          value={meter * 100}
-          size="xs"
-          colorPalette={tone === 'success' ? 'green' : 'brand'}
-          aria-label={label}
-        >
-          <Progress.Track rounded="full" bg="bg.muted">
-            <Progress.Range rounded="full" />
-          </Progress.Track>
-        </Progress.Root>
-      ) : (
-        hint && (
-          <Text truncate fontSize="xs" color="fg.muted">
-            {hint}
-          </Text>
-        )
-      )}
-    </Stack>
-  )
-}
-
-/** Right-hand panel for the song picked in the table. */
+/** Inspector for the song picked in the table. */
 function SongInspector({
   item,
   number,
   onViewChords,
   onEdit,
-  onOpenYouTube
+  onOpenYouTube,
+  onProgress
 }: {
   item: SetlistItem
   number: number
   onViewChords: () => void
   onEdit: () => void
   onOpenYouTube: () => void
+  onProgress: React.ComponentProps<typeof ProgressChips>['onChange']
 }): React.JSX.Element {
   const { song } = item
   const key = item.keyOverride || song.key
@@ -744,96 +863,79 @@ function SongInspector({
   const hasChords = !!song.chordUrl || !!song.content.trim()
 
   return (
-    <Stack
-      as="aside"
-      aria-label={`รายละเอียด: ${song.title}`}
-      display={{ base: 'none', xl: 'flex' }}
-      w="340px"
-      flexShrink={0}
-      gap="4"
-      overflowY="auto"
-      borderLeftWidth="1px"
-      p="4"
+    <ShellInspector
+      label={`รายละเอียด: ${song.title}`}
+      title={`เพลงที่ ${String(number).padStart(2, '0')}`}
+      actions={
+        <PanelAction label="คีย์ / โน้ตสำหรับงานนี้" onClick={onEdit}>
+          <Pencil />
+        </PanelAction>
+      }
     >
-      <Stack as="header" gap="2">
-        <Text
-          fontFamily="mono"
-          fontSize="xs"
-          fontWeight="bold"
-          letterSpacing="widest"
-          color="fg.muted"
-        >
-          เพลงที่ {String(number).padStart(2, '0')}
-        </Text>
-        <Box>
-          <Heading as="h2" size="xl" lineHeight="shorter" wordBreak="break-word">
-            {song.title}
-          </Heading>
-          <Text fontSize="sm" color="fg.muted">
-            {song.artist || '—'}
-          </Text>
-        </Box>
-        <Grid as="dl" templateColumns="repeat(3, 1fr)" gap="2" fontFamily="mono">
-          <InspectorStat
-            label={changedKey ? `Key (เดิม ${song.key ?? '–'})` : 'Key'}
-            value={key ?? '–'}
-            accent={!!key}
-            warning={changedKey}
-          />
-          <InspectorStat label="BPM" value={song.bpm?.toString() ?? '–'} />
-          <InspectorStat label="Length" value={formatClock(song.durationSec)} />
-        </Grid>
-      </Stack>
-
-      {(item.note || song.notes) && (
-        <Stack
-          as="section"
-          gap="1"
-          rounded="xl"
-          borderWidth="1px"
-          bg="bg.panel"
-          p="3"
-          fontSize="sm"
-        >
-          {item.note && <Text fontWeight="semibold">{item.note}</Text>}
-          {song.notes && (
-            <HStack align="flex-start" gap="1.5" color="fg.muted">
-              <Box mt="0.5" flexShrink={0}>
-                <StickyNote size={14} />
-              </Box>
-              {song.notes}
-            </HStack>
-          )}
+      <PanelBody>
+        <Stack gap="3">
+          <Box>
+            <Text as="h3" textStyle="title.section" wordBreak="break-word">
+              {song.title}
+            </Text>
+            <Text fontSize="sm" color="fg.muted">
+              {song.artist || '—'}
+            </Text>
+          </Box>
+          <Grid as="dl" templateColumns="repeat(3, 1fr)" gap="2">
+            <InspectorStat
+              label={changedKey ? `Key (เดิม ${song.key ?? '–'})` : 'Key'}
+              value={key ?? '–'}
+              accent={!!key}
+              warning={changedKey}
+            />
+            <InspectorStat label="BPM" value={song.bpm?.toString() ?? '–'} />
+            <InspectorStat label="Length" value={formatClock(song.durationSec)} />
+          </Grid>
         </Stack>
-      )}
 
-      <Stack as="section" gap="2">
-        <Text as="h3" {...CAPTION}>
-          Reference
-        </Text>
-        <YouTubePlayer url={song.youtubeUrl} title={song.title} />
-      </Stack>
+        {(item.note || song.notes) && (
+          <Stack as="section" gap="1" fontSize="sm">
+            <SectionLabel>โน้ต</SectionLabel>
+            {item.note && <Text fontWeight="semibold">{item.note}</Text>}
+            {song.notes && (
+              <HStack align="flex-start" gap="2" color="fg.muted">
+                <Flex h="5" align="center" flexShrink={0}>
+                  <StickyNote size={16} />
+                </Flex>
+                {song.notes}
+              </HStack>
+            )}
+          </Stack>
+        )}
 
-      <Stack mt="auto" gap="2">
+        {item.progress.length > 0 && (
+          <Stack as="section" gap="2">
+            <SectionLabel>ความพร้อมของสมาชิก (คลิกเพื่อเปลี่ยน)</SectionLabel>
+            <ProgressChips progress={item.progress} onChange={onProgress} />
+          </Stack>
+        )}
+
+        <Stack as="section" gap="2">
+          <SectionLabel>Reference</SectionLabel>
+          <YouTubePlayer url={song.youtubeUrl} title={song.title} />
+        </Stack>
+      </PanelBody>
+
+      <PanelFooter gap="2">
         <Button
-          colorPalette="brand"
-          size="lg"
-          w="full"
+          variant="outline"
+          flex="1"
           onClick={onViewChords}
           title={hasChords ? 'เปิดคอร์ดเต็มจอที่เพลงนี้' : 'เพลงนี้ยังไม่มีคอร์ด'}
         >
           <FileMusic /> ดูคอร์ด
         </Button>
-        <Grid templateColumns="repeat(2, 1fr)" gap="2">
-          <Button variant="outline" disabled={!song.youtubeUrl} onClick={onOpenYouTube}>
-            <ExternalLink /> YouTube
-          </Button>
-          <Button variant="outline" onClick={onEdit}>
-            <Pencil /> คีย์ / โน้ต
-          </Button>
-        </Grid>
-      </Stack>
-    </Stack>
+        <Button variant="outline" flex="1" disabled={!song.youtubeUrl} onClick={onOpenYouTube}>
+          <ExternalLink /> YouTube
+        </Button>
+      </PanelFooter>
+    </ShellInspector>
   )
 }
 
@@ -849,25 +951,23 @@ function InspectorStat({
   warning?: boolean
 }): React.JSX.Element {
   const tone = warning
-    ? { borderColor: 'orange.muted', bg: 'orange.subtle', color: 'orange.fg' }
+    ? { borderColor: 'warning.muted', bg: 'warning.subtle', color: 'warning.fg' }
     : accent
-      ? { borderColor: 'brand.solid', bg: 'brand.solid', color: 'brand.contrast' }
+      ? { borderColor: 'accent.muted', bg: 'accent.subtle', color: 'accent.fg' }
       : { bg: 'bg.panel' }
   return (
-    <Stack gap="0" rounded="lg" borderWidth="1px" px="2" py="1.5" {...tone}>
-      <Text
-        as="dt"
-        truncate
-        fontFamily="body"
-        fontSize="10px"
-        fontWeight="semibold"
-        letterSpacing="wider"
-        textTransform="uppercase"
-        opacity={0.7}
-      >
+    <Stack gap="0" rounded="inset" borderWidth="1px" p="2" {...tone}>
+      <Text as="dt" truncate textStyle="caption" color="inherit">
         {label}
       </Text>
-      <Text as="dd" fontSize="lg" lineHeight="shorter" fontWeight="bold">
+      <Text
+        as="dd"
+        fontFamily="mono"
+        fontSize="lg"
+        lineHeight="1.5rem"
+        fontWeight="bold"
+        fontVariantNumeric="tabular-nums"
+      >
         {value}
       </Text>
     </Stack>
@@ -905,11 +1005,9 @@ function AddSongsDialog({
           />
         </SearchGroup>
         {songs.data?.length === 0 ? (
-          <Text py="6" textAlign="center" fontSize="sm" color="fg.muted">
-            ไม่พบเพลง เพิ่มเพลงในแท็บ &quot;เพลง&quot; ก่อน
-          </Text>
+          <Placeholder>ไม่พบเพลง เพิ่มเพลงในแท็บ &quot;เพลง&quot; ก่อน</Placeholder>
         ) : (
-          <Stack as="ul" gap="0" maxH="55vh" divideY="1px" overflowY="auto">
+          <Stack as="ul" gap="0" maxH="55vh" overflowY="auto" mx="-4">
             {songs.data?.map((song) => {
               const added = inSetlist.has(song.id)
               return (
@@ -918,26 +1016,30 @@ function AddSongsDialog({
                     onClick={() => onAdd(song.id)}
                     display="flex"
                     w="full"
+                    h="row.h"
                     alignItems="center"
                     gap="3"
-                    px="2"
-                    py="2"
+                    px="panel.px"
                     textAlign="left"
                     cursor="pointer"
                     _hover={{ bg: 'bg.muted' }}
                   >
-                    <Center boxSize="7" flexShrink={0} color={added ? 'green.500' : 'brand.fg'}>
+                    <Center boxSize="8" flexShrink={0} color={added ? 'success.fg' : 'accent.fg'}>
                       {added ? <Check size={16} /> : <Plus size={16} />}
                     </Center>
                     <Box minW="0" flex="1">
-                      <Text truncate fontSize="sm" fontWeight="semibold">
+                      <Text truncate textStyle="title.item">
                         {song.title}
                       </Text>
                       <Text truncate fontSize="xs" color="fg.muted">
                         {song.artist || '—'}
                       </Text>
                     </Box>
-                    {song.key && <Badge tone="primary">{song.key}</Badge>}
+                    {song.key && (
+                      <Badge tone="key" fontFamily="mono">
+                        {song.key}
+                      </Badge>
+                    )}
                     <SongStatusBadge status={song.status} />
                   </chakra.button>
                 </li>
@@ -1039,7 +1141,7 @@ function SetlistFormDialog({
           <Button type="button" variant="ghost" onClick={onClose}>
             ยกเลิก
           </Button>
-          <Button type="submit" colorPalette="brand">
+          <Button type="submit" colorPalette="accent">
             บันทึก
           </Button>
         </HStack>

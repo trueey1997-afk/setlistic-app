@@ -181,8 +181,8 @@ function SongForm({
       {error && (
         <Text
           gridColumn="span 4"
-          rounded="md"
-          bg="red.subtle"
+          rounded="chip"
+          bg="danger.subtle"
           color="fg.error"
           px="3"
           py="2"
@@ -195,7 +195,7 @@ function SongForm({
         <Button type="button" variant="ghost" onClick={onCancel}>
           ยกเลิก
         </Button>
-        <Button type="submit" colorPalette="brand" loading={saving}>
+        <Button type="submit" colorPalette="accent" loading={saving}>
           บันทึก
         </Button>
       </HStack>

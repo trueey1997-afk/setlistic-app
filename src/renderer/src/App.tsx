@@ -1,10 +1,10 @@
-import { useState } from 'react'
-import { Flex, HStack, IconButton, NativeSelect, Tabs, Text } from '@chakra-ui/react'
-import { Moon, PanelLeftClose, PanelLeftOpen, Sun } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Flex, HStack, NativeSelect, Tabs, Text } from '@chakra-ui/react'
 import type { BandSummary } from '@shared/types'
 import { useAsync } from './hooks/useAsync'
-import { useTheme } from './lib/theme'
+import { AccentMenu, ThemeMenu } from './components/ThemeMenu'
 import { ToastProvider } from './components/toast'
+import { ShellProvider } from './components/shell'
 import { BandOnboarding, BandPage } from './components/BandPage'
 import { SongLibrary } from './components/SongLibrary'
 import { SetlistsPage } from './components/SetlistsPage'
@@ -16,7 +16,6 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'band', label: 'วง & สมาชิก' }
 ]
 const BAND_KEY = 'setlistic-band'
-const SIDEBAR_KEY = 'setlistic-sidebar'
 
 function readStoredBand(): number | null {
   try {
@@ -26,20 +25,20 @@ function readStoredBand(): number | null {
   }
 }
 
-function readSidebarOpen(): boolean {
-  try {
-    return localStorage.getItem(SIDEBAR_KEY) !== 'closed'
-  } catch {
-    return true
-  }
+function App(): React.JSX.Element {
+  return (
+    <ToastProvider>
+      <ShellProvider>
+        <AppFrame />
+      </ShellProvider>
+    </ToastProvider>
+  )
 }
 
-function App(): React.JSX.Element {
-  const [theme, toggleTheme] = useTheme()
+function AppFrame(): React.JSX.Element {
   const [tab, setTab] = useState<Tab>('setlists')
   const [storedBandId, setStoredBandId] = useState(readStoredBand)
   const [creatingBand, setCreatingBand] = useState(false)
-  const [sidebarOpen, setSidebarOpen] = useState(readSidebarOpen)
   const bands = useAsync(() => window.setlistic.bands.list(), 'bands')
 
   // Fall back to the first band if the remembered one was deleted
@@ -55,137 +54,136 @@ function App(): React.JSX.Element {
     }
   }
 
-  function toggleSidebar(): void {
-    setSidebarOpen(!sidebarOpen)
-    try {
-      localStorage.setItem(SIDEBAR_KEY, sidebarOpen ? 'closed' : 'open')
-    } catch {
-      // Still toggles for this session
+  // Ctrl+1/2/3 switch screens
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return
+      const next = TABS[Number(e.key) - 1]
+      if (!next) return
+      e.preventDefault()
+      setTab(next.id)
     }
-  }
-
-  // Only the setlist and song pages have a list pane
-  const hasSidebar = !!band && !creatingBand && tab !== 'band'
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   return (
-    <ToastProvider>
-      <Flex direction="column" h="full">
-        <Flex
-          as="header"
-          h="12"
-          flexShrink={0}
-          align="center"
-          justify="space-between"
-          gap="4"
-          borderBottomWidth="1px"
-          px="4"
-        >
-          <HStack minW="0" gap="5">
-            {hasSidebar && (
-              <IconButton
-                variant="ghost"
-                size="sm"
-                color="fg.muted"
-                onClick={toggleSidebar}
-                aria-label={sidebarOpen ? 'ซ่อนรายการ' : 'แสดงรายการ'}
-                aria-expanded={sidebarOpen}
-                title={sidebarOpen ? 'ซ่อนรายการ' : 'แสดงรายการ'}
-              >
-                {sidebarOpen ? <PanelLeftClose /> : <PanelLeftOpen />}
-              </IconButton>
-            )}
-            <Text fontSize="sm" fontWeight="bold" letterSpacing="0.2em" textTransform="uppercase">
-              Setlistic
-            </Text>
-            {band && (
-              <>
-                <NativeSelect.Root size="xs" maxW="48" aria-label="เลือกวง">
-                  <NativeSelect.Field
-                    value={band.id}
-                    fontWeight="semibold"
-                    onChange={(e) =>
-                      e.target.value === 'new'
-                        ? setCreatingBand(true)
-                        : selectBand(Number(e.target.value))
-                    }
-                  >
-                    {bands.data?.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name}
-                      </option>
-                    ))}
-                    <option value="new">+ สร้างวงใหม่…</option>
-                  </NativeSelect.Field>
-                  <NativeSelect.Indicator />
-                </NativeSelect.Root>
-                <Tabs.Root
-                  value={tab}
-                  onValueChange={(e) => setTab(e.value as Tab)}
-                  variant="line"
-                  colorPalette="brand"
-                  size="sm"
-                  h="12"
-                >
-                  <Tabs.List h="full" borderBottomWidth="0">
-                    {TABS.map((t) => (
-                      <Tabs.Trigger key={t.id} value={t.id} fontWeight="semibold" h="full">
-                        {t.label}
-                      </Tabs.Trigger>
-                    ))}
-                  </Tabs.List>
-                </Tabs.Root>
-              </>
-            )}
-          </HStack>
-          <IconButton
-            variant="ghost"
-            size="sm"
-            color="fg.muted"
-            onClick={toggleTheme}
-            aria-label={theme === 'dark' ? 'เปลี่ยนเป็นโหมดสว่าง' : 'เปลี่ยนเป็นโหมดมืด'}
-            title={theme === 'dark' ? 'โหมดสว่าง (สำหรับเวทีที่แสงจ้า)' : 'โหมดมืด'}
+    <Flex direction="column" h="full">
+      <Flex
+        as="header"
+        h="panel.headerH"
+        flexShrink={0}
+        align="center"
+        justify="space-between"
+        gap="4"
+        borderBottomWidth="1px"
+        px="panel.px"
+      >
+        <HStack minW="0" gap="4">
+          <Text
+            flexShrink={0}
+            whiteSpace="nowrap"
+            fontSize="sm"
+            fontWeight="bold"
+            letterSpacing="widest"
+            textTransform="uppercase"
           >
-            {theme === 'dark' ? <Sun /> : <Moon />}
-          </IconButton>
-        </Flex>
-
-        {bands.error ? (
-          <Text p="6" color="fg.error">
-            {bands.error}
+            Setlistic
           </Text>
-        ) : !bands.data ? null : !band || creatingBand ? (
-          <BandOnboarding
-            first={!band}
-            onCancel={band ? () => setCreatingBand(false) : undefined}
-            onCreated={(created) => {
-              setCreatingBand(false)
-              selectBand(created.id)
-              setTab('band')
-              bands.reload()
-            }}
-          />
-        ) : tab === 'setlists' ? (
-          <SetlistsPage
-            key={band.id}
-            bandId={band.id}
-            bandName={band.name}
-            sidebarOpen={sidebarOpen}
-          />
-        ) : tab === 'songs' ? (
-          <SongLibrary key={band.id} bandId={band.id} sidebarOpen={sidebarOpen} />
-        ) : (
-          <BandPage
-            key={band.id}
-            bandId={band.id}
-            onChanged={bands.reload}
-            onDeleted={() => {
-              setTab('setlists')
-              bands.reload()
-            }}
-          />
-        )}
+          {band && (
+            <>
+              <NativeSelect.Root
+                size="xs"
+                minW="0"
+                maxW="control.select"
+                flexShrink={1}
+                aria-label="เลือกวง"
+              >
+                <NativeSelect.Field
+                  value={band.id}
+                  fontWeight="semibold"
+                  whiteSpace="nowrap"
+                  textOverflow="ellipsis"
+                  onChange={(e) =>
+                    e.target.value === 'new'
+                      ? setCreatingBand(true)
+                      : selectBand(Number(e.target.value))
+                  }
+                >
+                  {bands.data?.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                  <option value="new">+ สร้างวงใหม่…</option>
+                </NativeSelect.Field>
+                <NativeSelect.Indicator />
+              </NativeSelect.Root>
+              <Tabs.Root
+                value={tab}
+                onValueChange={(e) => setTab(e.value as Tab)}
+                variant="line"
+                colorPalette="accent"
+                size="sm"
+                h="panel.headerH"
+                flexShrink={0}
+              >
+                <Tabs.List h="full" borderBottomWidth="0">
+                  {TABS.map((t, i) => (
+                    <Tabs.Trigger
+                      key={t.id}
+                      value={t.id}
+                      fontWeight="semibold"
+                      h="full"
+                      whiteSpace="nowrap"
+                      flexShrink={0}
+                      title={`Ctrl+${i + 1}`}
+                    >
+                      {t.label}
+                    </Tabs.Trigger>
+                  ))}
+                </Tabs.List>
+              </Tabs.Root>
+            </>
+          )}
+        </HStack>
+        <HStack gap="1" flexShrink={0}>
+          <ThemeMenu />
+          <AccentMenu />
+        </HStack>
       </Flex>
-    </ToastProvider>
+
+      {bands.error ? (
+        <Text p="panel.px" color="fg.error">
+          {bands.error}
+        </Text>
+      ) : !bands.data ? null : !band || creatingBand ? (
+        <BandOnboarding
+          first={!band}
+          onCancel={band ? () => setCreatingBand(false) : undefined}
+          onCreated={(created) => {
+            setCreatingBand(false)
+            selectBand(created.id)
+            setTab('band')
+            bands.reload()
+          }}
+        />
+      ) : tab === 'setlists' ? (
+        <SetlistsPage key={band.id} bandId={band.id} bandName={band.name} />
+      ) : tab === 'songs' ? (
+        <SongLibrary key={band.id} bandId={band.id} />
+      ) : (
+        <BandPage
+          key={band.id}
+          bandId={band.id}
+          onChanged={bands.reload}
+          onDeleted={() => {
+            setTab('setlists')
+            bands.reload()
+          }}
+        />
+      )}
+    </Flex>
   )
 }
 

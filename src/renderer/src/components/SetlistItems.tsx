@@ -7,9 +7,11 @@ import {
   Flex,
   Grid,
   HStack,
+  Icon,
   IconButton,
   Input,
   NativeSelect,
+  Span,
   Text,
   Wrap,
   type ButtonProps,
@@ -45,7 +47,7 @@ import {
 import { formatClock } from '@shared/format'
 import { isItemReady } from '@shared/lineSummary'
 import { KeyChords } from './KeyChords'
-import { Badge, Dialog, Field } from './ui'
+import { Badge, Dialog, Field, RowAction, selectedBar } from './ui'
 
 const NEXT_STATUS: Record<PracticeStatus, PracticeStatus> = {
   not_started: 'practicing',
@@ -55,28 +57,40 @@ const NEXT_STATUS: Record<PracticeStatus, PracticeStatus> = {
 const STATUS_ICON = { not_started: Circle, practicing: Clock, ready: Check }
 const STATUS_CHIP: Record<PracticeStatus, ButtonProps> = {
   not_started: { variant: 'outline', colorPalette: 'gray', color: 'fg.muted' },
-  practicing: { variant: 'surface', colorPalette: 'orange' },
-  ready: { variant: 'surface', colorPalette: 'green' }
+  practicing: { variant: 'surface', colorPalette: 'warning' },
+  ready: { variant: 'surface', colorPalette: 'success' }
 }
 
 /** Grip · # · song · key · BPM · time · actions; shared by the header and every row. */
 const COLUMNS: GridProps = {
   display: 'grid',
-  gridTemplateColumns: '2rem 2.75rem minmax(0,1fr) 4rem 3.5rem 3.5rem 4.5rem',
+  gridTemplateColumns: '{sizes.setlistColumns}',
   alignItems: 'center',
-  gap: '2'
+  gap: '2',
+  px: '2'
 }
+
+/** Numbers (and the key) sit right-aligned in tabular figures so columns line up. */
+const NUMERIC = {
+  textAlign: 'right',
+  fontFamily: 'mono',
+  fontSize: 'sm',
+  fontVariantNumeric: 'tabular-nums'
+} as const
+
+/** Hidden in compact rows, which have room for one line only. */
+const HIDE_WHEN_COMPACT = { css: { '[data-density=compact] &': { display: 'none' } } }
 
 export function SetlistItems({
   items,
   numberOf,
   selectedId,
   reorderable = true,
+  compact = false,
   onSelect,
   onReorder,
   onRemove,
   onEdit,
-  onProgress,
   onPlayed
 }: {
   items: SetlistItem[]
@@ -85,14 +99,15 @@ export function SetlistItems({
   selectedId: number | null
   /** Off while the list is filtered, since a move needs the whole order. */
   reorderable?: boolean
+  /** Shorter one-line rows for long sets. */
+  compact?: boolean
   onSelect: (item: SetlistItem) => void
   onReorder: (items: SetlistItem[]) => void
   onRemove: (item: SetlistItem) => void
-  onEdit: (item: SetlistItem, input: SetlistItemInput) => void
-  onProgress: (item: SetlistItem, memberId: number, status: PracticeStatus) => void
+  /** Open the per-setlist key/note dialog for this item. */
+  onEdit: (item: SetlistItem) => void
   onPlayed: (item: SetlistItem, played: boolean) => void
 }): React.JSX.Element {
-  const [editing, setEditing] = useState<SetlistItem | null>(null)
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -110,52 +125,42 @@ export function SetlistItems({
   }
 
   return (
-    <>
-      <Box overflow="hidden" rounded="xl" borderWidth="1px" bg="bg.panel">
-        <Grid
-          aria-hidden
-          {...COLUMNS}
-          borderBottomWidth="1px"
-          px="2"
-          py="2"
-          fontSize="10px"
-          fontWeight="bold"
-          letterSpacing="widest"
-          color="fg.muted"
-          textTransform="uppercase"
-        >
-          <span />
-          <Text textAlign="center">#</Text>
-          <Text>เพลง</Text>
-          <Text textAlign="center">Key</Text>
-          <Text textAlign="right">BPM</Text>
-          <Text textAlign="right">Time</Text>
-          <span />
-        </Grid>
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-          <SortableContext items={items.map((it) => it.id)} strategy={verticalListSortingStrategy}>
-            <Box as="ol" divideY="1px">
-              {items.map((item) => (
-                <Row
-                  key={item.id}
-                  item={item}
-                  number={numberOf(item)}
-                  selected={item.id === selectedId}
-                  reorderable={reorderable}
-                  onSelect={() => onSelect(item)}
-                  onEdit={() => setEditing(item)}
-                  onRemove={() => onRemove(item)}
-                  onProgress={(memberId, status) => onProgress(item, memberId, status)}
-                  onPlayed={(played) => onPlayed(item, played)}
-                />
-              ))}
-            </Box>
-          </SortableContext>
-        </DndContext>
-      </Box>
-
-      <ItemDialog item={editing} onClose={() => setEditing(null)} onSubmit={onEdit} />
-    </>
+    <Box
+      data-density={compact ? 'compact' : 'comfortable'}
+      overflow="hidden"
+      rounded="card"
+      borderWidth="1px"
+      bg="bg.panel"
+    >
+      <Grid aria-hidden {...COLUMNS} h="8" borderBottomWidth="1px" textStyle="caption">
+        <span />
+        <Text ps="6">#</Text>
+        <Text>เพลง</Text>
+        <Text textAlign="right">Key</Text>
+        <Text textAlign="right">BPM</Text>
+        <Text textAlign="right">Time</Text>
+        <span />
+      </Grid>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <SortableContext items={items.map((it) => it.id)} strategy={verticalListSortingStrategy}>
+          <Box as="ol" divideY="1px">
+            {items.map((item) => (
+              <Row
+                key={item.id}
+                item={item}
+                number={numberOf(item)}
+                selected={item.id === selectedId}
+                reorderable={reorderable}
+                onSelect={() => onSelect(item)}
+                onEdit={() => onEdit(item)}
+                onRemove={() => onRemove(item)}
+                onPlayed={(played) => onPlayed(item, played)}
+              />
+            ))}
+          </Box>
+        </SortableContext>
+      </DndContext>
+    </Box>
   )
 }
 
@@ -242,7 +247,7 @@ function ItemForm({
         <Button type="button" variant="ghost" onClick={onCancel}>
           ยกเลิก
         </Button>
-        <Button type="submit" colorPalette="brand">
+        <Button type="submit" colorPalette="accent">
           บันทึก
         </Button>
       </HStack>
@@ -258,7 +263,6 @@ function Row({
   onSelect,
   onEdit,
   onRemove,
-  onProgress,
   onPlayed
 }: {
   item: SetlistItem
@@ -268,7 +272,6 @@ function Row({
   onSelect: () => void
   onEdit: () => void
   onRemove: () => void
-  onProgress: (memberId: number, status: PracticeStatus) => void
   onPlayed: (played: boolean) => void
 }): React.JSX.Element {
   const {
@@ -283,6 +286,7 @@ function Row({
   const { song } = item
   const key = item.keyOverride || song.key
   const changedKey = !!item.keyOverride && item.keyOverride !== song.key
+  const readyMembers = item.progress.filter((p) => p.status === 'ready').length
 
   return (
     <Box
@@ -291,27 +295,26 @@ function Row({
       style={{ transform: CSS.Transform.toString(transform), transition }}
       onClick={onSelect}
       className="group"
-      position="relative"
       cursor="pointer"
-      borderLeftWidth="2px"
-      borderColor={isDragging || selected ? 'brand.solid' : 'transparent'}
-      bg={isDragging || selected ? 'bg.muted' : undefined}
-      _hover={{ bg: 'bg.muted' }}
-      {...(isDragging && { zIndex: 1, shadow: 'xl' })}
+      bg={isDragging ? 'bg.panel' : selected ? 'bg.selected' : undefined}
+      _hover={{ bg: selected ? 'bg.selected' : 'bg.muted' }}
+      {...selectedBar(isDragging || selected)}
+      {...(isDragging && { zIndex: 1, shadow: 'lifted' })}
     >
-      <Grid {...COLUMNS} px="2" py="2">
+      <Grid {...COLUMNS} h="row.h">
         {/* Arrow keys move the row once the grip has focus (dnd-kit keyboard sensor) */}
         <IconButton
           ref={setActivatorNodeRef}
           {...attributes}
           {...listeners}
           variant="ghost"
-          size="2xs"
+          size="xs"
           color="fg.muted"
           disabled={!reorderable}
           onClick={(e) => e.stopPropagation()}
           cursor="grab"
           touchAction="none"
+          _icon={{ boxSize: 'icon.size' }}
           _active={{ cursor: 'grabbing' }}
           _disabled={{ cursor: 'default', opacity: 0.25 }}
           aria-label={`ลากเพื่อย้าย ${song.title}`}
@@ -320,15 +323,10 @@ function Row({
           <GripVertical />
         </IconButton>
 
-        <HStack
-          justify="center"
-          gap="1.5"
-          onClick={(e) => e.stopPropagation()}
-          title="ติ๊กเมื่อเล่นเพลงนี้แล้ว"
-        >
+        <HStack gap="2" onClick={(e) => e.stopPropagation()} title="ติ๊กเมื่อเล่นเพลงนี้แล้ว">
           <Checkbox.Root
-            size="xs"
-            colorPalette="brand"
+            size="sm"
+            colorPalette="accent"
             checked={item.played}
             onCheckedChange={(e) => onPlayed(e.checked === true)}
             aria-label={`เล่นแล้ว: ${song.title}`}
@@ -336,10 +334,8 @@ function Row({
             <Checkbox.HiddenInput />
             <Checkbox.Control />
             <Checkbox.Label
-              fontFamily="mono"
-              fontSize="sm"
+              {...NUMERIC}
               fontWeight="bold"
-              fontVariantNumeric="tabular-nums"
               color={item.played ? 'fg.muted' : undefined}
             >
               {String(number).padStart(2, '0')}
@@ -348,70 +344,50 @@ function Row({
         </HStack>
 
         <Box minW="0" opacity={item.played ? 0.5 : undefined}>
-          <Text
-            truncate
-            fontSize="sm"
-            fontWeight="semibold"
-            textDecoration={item.played ? 'line-through' : undefined}
-          >
+          <HStack gap="1">
             {isItemReady(item) && (
-              <Check
-                size={14}
-                color="var(--chakra-colors-green-500)"
-                style={{ display: 'inline', marginRight: 4 }}
-                aria-label="ทั้งวงพร้อม"
-              />
+              <Icon color="success.fg" boxSize="icon.size" flexShrink={0}>
+                <Check aria-label="ทั้งวงพร้อม" />
+              </Icon>
             )}
-            {song.title}
-          </Text>
-          <Text truncate fontSize="xs" color="fg.muted">
+            <Text
+              truncate
+              textStyle="title.item"
+              textDecoration={item.played ? 'line-through' : undefined}
+            >
+              {song.title}
+            </Text>
+          </HStack>
+          <Text truncate fontSize="xs" lineHeight="1rem" color="fg.muted" {...HIDE_WHEN_COMPACT}>
+            {item.progress.length > 0 && (
+              <Span fontVariantNumeric="tabular-nums">
+                พร้อม {readyMembers}/{item.progress.length} ·{' '}
+              </Span>
+            )}
             {song.artist || '—'}
-            {item.note && (
-              <Text as="span" color="fg">
-                {' '}
-                · {item.note}
-              </Text>
-            )}
+            {item.note && <Span color="fg.default"> · {item.note}</Span>}
           </Text>
         </Box>
 
-        <Flex justify="center">
+        <Flex justify="flex-end">
           {key ? (
-            <Badge
-              tone={changedKey ? 'warning' : 'key'}
-              minW="10"
-              justifyContent="center"
-              fontFamily="mono"
-              fontSize="sm"
-            >
+            <Badge tone={changedKey ? 'warning' : 'key'} fontFamily="mono" fontSize="sm">
               {key}
             </Badge>
           ) : (
-            <Text fontFamily="mono" color="fg.muted">
+            <Text {...NUMERIC} color="fg.muted">
               –
             </Text>
           )}
         </Flex>
-        <Text
-          textAlign="right"
-          fontFamily="mono"
-          fontSize="sm"
-          fontWeight="bold"
-          fontVariantNumeric="tabular-nums"
-        >
+        <Text {...NUMERIC} fontWeight="bold">
           {song.bpm ?? (
-            <Text as="span" color="fg.muted">
+            <Span color="fg.muted" fontWeight="normal">
               –
-            </Text>
+            </Span>
           )}
         </Text>
-        <Text
-          textAlign="right"
-          fontFamily="mono"
-          fontSize="sm"
-          color="fg.muted"
-          fontVariantNumeric="tabular-nums"
-        >
+        <Text {...NUMERIC} color="fg.muted">
           {formatClock(song.durationSec)}
         </Text>
 
@@ -422,41 +398,24 @@ function Row({
           _groupHover={{ opacity: 1 }}
           onClick={(e) => e.stopPropagation()}
         >
-          <IconButton
-            variant="ghost"
-            size="xs"
-            color="fg.muted"
-            onClick={onEdit}
-            aria-label="ตั้งค่าคีย์และโน้ต"
-            title="ตั้งค่าคีย์และโน้ต"
-          >
+          <RowAction label="ตั้งค่าคีย์และโน้ต" onClick={onEdit}>
             <Pencil />
-          </IconButton>
-          <IconButton
-            variant="ghost"
-            size="xs"
-            color="fg.muted"
-            _hover={{ bg: 'red.subtle', color: 'fg.error' }}
+          </RowAction>
+          <RowAction
+            label="เอาออกจากเซ็ตลิสต์"
+            _hover={{ bg: 'danger.subtle', color: 'danger.fg' }}
             onClick={onRemove}
-            aria-label="เอาออกจากเซ็ตลิสต์"
-            title="เอาออกจากเซ็ตลิสต์"
           >
             <X />
-          </IconButton>
+          </RowAction>
         </Flex>
       </Grid>
-
-      {item.progress.length > 0 && (
-        <Box pr="2" pb="2" pl="6.25rem" onClick={(e) => e.stopPropagation()}>
-          <ProgressChips progress={item.progress} onChange={onProgress} />
-        </Box>
-      )}
     </Box>
   )
 }
 
 /** Click a member to cycle: ยังไม่เริ่ม → กำลังซ้อม → ซ้อมแล้ว. */
-function ProgressChips({
+export function ProgressChips({
   progress,
   onChange
 }: {
@@ -464,20 +423,19 @@ function ProgressChips({
   onChange: (memberId: number, status: PracticeStatus) => void
 }): React.JSX.Element {
   return (
-    <Wrap as="ul" gap="1">
+    <Wrap as="ul" gap="2">
       {progress.map((p) => {
-        const Icon = STATUS_ICON[p.status]
+        const StatusIcon = STATUS_ICON[p.status]
         return (
           <li key={p.member.id}>
             <Button
-              size="2xs"
-              px="2"
+              size="xs"
               fontWeight="semibold"
               {...STATUS_CHIP[p.status]}
               onClick={() => onChange(p.member.id, NEXT_STATUS[p.status])}
               title={`${p.member.name}: ${PRACTICE_STATUS_LABEL[p.status]} (คลิกเพื่อเปลี่ยน)`}
             >
-              <Icon />
+              <StatusIcon />
               {p.member.name}
             </Button>
           </li>

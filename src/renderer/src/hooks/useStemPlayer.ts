@@ -12,10 +12,14 @@ const DEFAULT_MIX = Object.fromEntries(
   STEM_NAMES.map((n) => [n, { volume: 1, muted: false, solo: false }])
 ) as Record<StemName, StemMix>
 
+/** Master volume a new mixer starts at (0–1). */
+export const DEFAULT_MASTER_VOLUME = 0.8
+
 /**
  * Plays several stems in perfect sync with Web Audio: every stem is decoded into memory and
- * started on the same AudioContext clock, each through its own gain (volume / mute / solo).
- * Stems load on the first play. Remount (change `key`) when the stem files change.
+ * started on the same AudioContext clock, each through its own gain (volume / mute / solo),
+ * then all through one master gain. Stems load on the first play. Remount (change `key`)
+ * when the stem files change.
  */
 export function useStemPlayer(stems: { name: StemName; url: string }[]): {
   status: 'idle' | 'loading' | 'ready' | 'error'
@@ -25,10 +29,13 @@ export function useStemPlayer(stems: { name: StemName; url: string }[]): {
   position: number
   duration: number
   mix: Record<StemName, StemMix>
+  /** 0–1, applied after the per-stem mix */
+  masterVolume: number
   play: () => Promise<void>
   pause: () => void
   seek: (seconds: number) => void
   setMix: (name: StemName, patch: Partial<StemMix>) => void
+  setMasterVolume: (volume: number) => void
 } {
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -37,8 +44,10 @@ export function useStemPlayer(stems: { name: StemName; url: string }[]): {
   const [position, setPosition] = useState(0)
   const [duration, setDuration] = useState(0)
   const [mix, setMixState] = useState(DEFAULT_MIX)
+  const [masterVolume, setMasterVolume] = useState(DEFAULT_MASTER_VOLUME)
 
   const ctxRef = useRef<AudioContext | null>(null)
+  const masterRef = useRef<GainNode | null>(null)
   const buffersRef = useRef<{ name: StemName; buffer: AudioBuffer; gain: GainNode }[]>([])
   const sourcesRef = useRef<AudioBufferSourceNode[]>([])
   /** Context time when playback started, and the song position it started from. */
@@ -64,6 +73,12 @@ export function useStemPlayer(stems: { name: StemName; url: string }[]): {
     try {
       const ctx = ctxRef.current ?? new AudioContext()
       ctxRef.current = ctx
+      if (!masterRef.current) {
+        masterRef.current = ctx.createGain()
+        masterRef.current.gain.value = masterVolume
+        masterRef.current.connect(ctx.destination)
+      }
+      const master = masterRef.current
       const loaded = await Promise.all(
         stems.map(async ({ name, url }) => {
           const res = await fetch(url)
@@ -71,7 +86,7 @@ export function useStemPlayer(stems: { name: StemName; url: string }[]): {
           const buffer = await ctx.decodeAudioData(await res.arrayBuffer())
           setLoadedCount((n) => n + 1)
           const gain = ctx.createGain()
-          gain.connect(ctx.destination)
+          gain.connect(master)
           return { name, buffer, gain }
         })
       )
@@ -84,6 +99,8 @@ export function useStemPlayer(stems: { name: StemName; url: string }[]): {
       setStatus('error')
       return false
     }
+    // masterVolume only seeds a new master gain; later changes go through the effect below
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stems])
 
   const startAt = useCallback(
@@ -142,6 +159,13 @@ export function useStemPlayer(stems: { name: StemName; url: string }[]): {
     }
   }, [mix, status])
 
+  // Apply the master volume (smoothed, so dragging the slider doesn't click)
+  useEffect(() => {
+    const master = masterRef.current
+    if (!master) return
+    master.gain.setTargetAtTime(masterVolume, ctxRef.current?.currentTime ?? 0, 0.015)
+  }, [masterVolume, status])
+
   // Move the playhead while playing; stop at the end
   useEffect(() => {
     if (!playing) return
@@ -181,9 +205,11 @@ export function useStemPlayer(stems: { name: StemName; url: string }[]): {
     position,
     duration,
     mix,
+    masterVolume,
     play,
     pause,
     seek,
-    setMix
+    setMix,
+    setMasterVolume
   }
 }
